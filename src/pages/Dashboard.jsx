@@ -42,14 +42,18 @@ export default function Dashboard({ currentUser, logout }) {
         </button>
       </header>
 
-      <main className="container" style={{ flex: 1, paddingBottom: '100px' }}>
-        <div style={{ display: activeTab === 'learn' ? 'block' : 'none' }}>
+      <main className="container" style={{ 
+        flex: 1, paddingBottom: '100px', 
+        maskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)',
+        WebkitMaskImage: 'linear-gradient(to bottom, black 85%, transparent 100%)'
+      }}>
+        <div style={{ display: activeTab === 'learn' ? 'block' : 'none', animation: activeTab === 'learn' ? 'fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1)' : 'none' }}>
           <Learn currentUser={currentUser} />
         </div>
-        <div style={{ display: activeTab === 'quiz' ? 'block' : 'none' }}>
+        <div style={{ display: activeTab === 'quiz' ? 'block' : 'none', animation: activeTab === 'quiz' ? 'fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1)' : 'none' }}>
           <Quiz currentUser={currentUser} />
         </div>
-        <div style={{ display: activeTab === 'dictionary' ? 'block' : 'none' }}>
+        <div style={{ display: activeTab === 'dictionary' ? 'block' : 'none', animation: activeTab === 'dictionary' ? 'fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1)' : 'none' }}>
           <Dictionary currentUser={currentUser} />
         </div>
       </main>
@@ -64,13 +68,18 @@ export default function Dashboard({ currentUser, logout }) {
           return (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                if (navigator.vibrate) navigator.vibrate(10);
+                setActiveTab(item.id);
+              }}
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1,
                 padding: '8px', background: isActive ? 'var(--surface-color)' : 'transparent',
                 border: 'none', borderRadius: 'var(--radius-pill)', cursor: 'pointer',
                 color: isActive ? 'var(--accent-color)' : 'var(--text-secondary)',
-                transition: 'all 0.2s ease', boxShadow: isActive ? 'var(--shadow-sm)' : 'none'
+                transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1)', 
+                boxShadow: isActive ? 'var(--shadow-md)' : 'none',
+                transform: isActive ? 'scale(1)' : 'scale(0.95)'
               }}
             >
               <Icon path={item.icon.path} size={24} style={{ marginBottom: '4px' }} />

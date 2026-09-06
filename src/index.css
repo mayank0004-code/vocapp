@@ -59,6 +59,7 @@
 
 body {
   font-family: var(--font-family);
+  font-optical-sizing: auto;
   background-color: var(--bg-color);
   color: var(--text-primary);
   line-height: 1.5;
@@ -99,7 +100,7 @@ body {
   border-radius: var(--radius-pill);
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1);
   font-family: var(--font-family);
 }
 
@@ -139,7 +140,7 @@ body {
   border: 1px solid var(--border-color);
   background-color: var(--surface-color);
   color: var(--text-primary);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.4s cubic-bezier(0.175, 0.885, 0.32, 1), box-shadow 0.4s cubic-bezier(0.175, 0.885, 0.32, 1);
 }
 
 .input:focus {
@@ -178,8 +179,35 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideOutLeft {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-30px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-panel, .bottom-nav {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--surface-color) !important;
+  }
 }
 .animate-spin {
   animation: spin 1s linear infinite;

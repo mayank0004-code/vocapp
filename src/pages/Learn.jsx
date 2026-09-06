@@ -90,6 +90,7 @@ export default function Learn({ currentUser }) {
       const evaluation = await evaluateSentence(wordData.word, currentType, sentenceInput.trim());
       
       if (evaluation.isCorrect) {
+        if (navigator.vibrate) navigator.vibrate([15, 50, 15]);
         setFeedback({ type: 'success', message: evaluation.feedback });
         
         const updatedSentences = { ...savedSentences };
@@ -104,7 +105,7 @@ export default function Learn({ currentUser }) {
            setTimeout(() => {
              setStep(step + 1);
              setFeedback(null);
-           }, 1500);
+           }, 800);
         } else {
            await saveLearnedWord(currentUser.uid, {
              ...wordData,
@@ -113,12 +114,14 @@ export default function Learn({ currentUser }) {
            setTimeout(() => {
              setStep(4);
              setFeedback(null);
-           }, 1500);
+           }, 800);
         }
       } else {
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
         setFeedback({ type: 'error', message: evaluation.feedback });
       }
     } catch (error) {
+      if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
       setFeedback({ type: 'error', message: "Failed to evaluate sentence." });
     } finally {
       setGrading(false);
@@ -191,7 +194,7 @@ export default function Learn({ currentUser }) {
       </div>
 
       {wordData && (
-        <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', animation: 'fadeIn 0.3s ease-out' }}>
+        <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', animation: 'fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
             <div>
               <h2 className="text-title" style={{ margin: 0 }}>{wordData.word}</h2>
@@ -250,7 +253,7 @@ export default function Learn({ currentUser }) {
       )}
 
       {step > 0 && step < 4 && (
-        <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', border: '2px solid var(--accent-color)' }}>
+        <div key={step} className="glass-panel" style={{ padding: '24px', marginBottom: '24px', border: '2px solid var(--accent-color)', animation: 'slideInRight 0.5s cubic-bezier(0.175, 0.885, 0.32, 1)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <h2 className="text-heading">{getStepTitle()}</h2>
             <span className="text-caption" style={{ fontWeight: 600, color: 'var(--accent-color)' }}>Step {step} of 3</span>

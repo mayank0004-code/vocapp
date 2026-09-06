@@ -88,15 +88,22 @@ export default function Quiz({ currentUser }) {
         message = isCorrect ? "Correct! " + message : "Incorrect. The correct answer was: " + currentQuestion.correctAnswer + ". " + message;
       }
       
+      if (isCorrect) {
+        if (navigator.vibrate) navigator.vibrate([15, 50, 15]);
+      } else {
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
+      }
+
       setFeedback({ isCorrect, message });
       await updateWordSRS(currentUser.uid, currentWord.id, isCorrect, currentWord.interval);
       
       if (isCorrect) {
         setTimeout(() => {
           handleNext();
-        }, 3000);
+        }, 2000);
       }
     } catch (error) {
+      if (navigator.vibrate) navigator.vibrate([50, 50, 50]);
       setFeedback({ isCorrect: false, message: "Failed to evaluate answer. Please try again." });
     } finally {
       setEvaluating(false);

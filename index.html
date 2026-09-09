@@ -3,8 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>temp-app</title>
+    <!-- viewport-fit=cover: required for env(safe-area-inset-*) to resolve.
+         Without this the entire safe-area effort silently does nothing. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- theme-color: matches status bar to the app header in both schemes -->
+    <meta name="theme-color" content="#f5f5f7" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+    <title>Vocapp</title>
   </head>
   <body>
     <div id="root"></div>

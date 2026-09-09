@@ -14,10 +14,10 @@ export const fetchWordBreakdown = async (word, contextSentence = '') => {
   }
 };
 
-export const evaluateSentence = async (word, sentenceType, sentence) => {
+export const evaluateSentence = async (word, sentenceType, sentence, mistakePatterns = '') => {
   try {
     const evaluate = httpsCallable(functions, 'evaluateSentence', { timeout: 120000 });
-    const result = await evaluate({ word, sentenceType, sentence });
+    const result = await evaluate({ word, sentenceType, sentence, mistakePatterns });
     return result.data;
   } catch (error) {
     console.error("Error calling evaluateSentence:", error);

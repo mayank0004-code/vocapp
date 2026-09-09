@@ -8,10 +8,12 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "deploy": "PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" firebase deploy"
+    "deploy": "PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" firebase deploy",
+    "deploy:hosting": "HOST=127.0.0.1 npx firebase-tools deploy --only hosting"
   },
   "dependencies": {
     "firebase": "^12.18.0",
+    "framer-motion": "^11.18.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

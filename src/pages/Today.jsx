@@ -137,8 +137,19 @@ function PracticeModal({ wordData, onComplete, onClose, currentUser }) {
           <div style={{ height: '100%', width: `${(step / 3) * 100}%`, background: 'var(--accent-color)', borderRadius: 3, transition: 'width 400ms ease' }} />
         </div>
 
-        <p className="t-label" style={{ marginBottom: 'var(--sp-2)' }}>Practicing: {wordData.word}</p>
-
+        <div style={{ marginBottom: 'var(--sp-4)', padding: 'var(--sp-3)', background: 'rgba(120,120,128,0.08)', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--sp-2)', marginBottom: 'var(--sp-1)' }}>
+            <span style={{ fontSize: 'var(--type-body)', fontWeight: 600, color: 'var(--text-primary)' }}>{wordData.word}</span>
+          </div>
+          <p style={{ fontSize: 'var(--type-sm)', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+            {wordData.definition}
+          </p>
+          {wordData.contextMeaning && (
+            <p style={{ fontSize: 'var(--type-sm)', color: 'var(--text-secondary)', margin: 'var(--sp-2) 0 0', fontStyle: 'italic', borderLeft: '2px solid var(--accent-color)', paddingLeft: 'var(--sp-2)' }}>
+              {wordData.contextMeaning}
+            </p>
+          )}
+        </div>
         <textarea
           className="input"
           style={{ minHeight: 100, resize: 'vertical', marginBottom: 'var(--sp-3)' }}

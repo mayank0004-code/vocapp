@@ -266,7 +266,7 @@ function WordContent({ wordData, playAudio }) {
     <div style={{ padding: 'var(--sp-4) var(--sp-5) 0', cursor: 'auto' }}>
 
       {/* 1. Word + audio */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--sp-2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--sp-2)', paddingRight: 48 }}>
         <h2
           id="sheet-word-heading"
           className="t-display"

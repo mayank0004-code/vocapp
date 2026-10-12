@@ -134,8 +134,8 @@ export function DataProvider({ currentUser, children }) {
       };
     });
 
-    // Mastered words (interval >= 14 or status === 'mastered')
-    const masteredWords = words.filter(w => (w.interval && w.interval >= 14) || w.status === 'mastered');
+    // Mastered words (only words that have breached the 21 days due mark)
+    const masteredWords = words.filter(w => typeof w.interval === 'number' && w.interval >= 21);
 
     // Learning words
     const learningWords = words.filter(w => !dueWords.includes(w) && !masteredWords.includes(w));

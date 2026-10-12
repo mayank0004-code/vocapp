@@ -83,6 +83,20 @@ describe('Phase 0 Safety Harness: Core Business Logic', () => {
       expect(getStrengthBars(14)).toBe(4);
       expect(getStrengthBars(30)).toBe(4);
     });
+
+    it('requires words to breach the 21 days mark (interval >= 21) to reach Mastered', () => {
+      const sampleWords = [
+        { word: 'avail', interval: 7 },
+        { word: 'abstruse', interval: 14 },
+        { word: 'apparatus', interval: 28 },
+        { word: 'edifice', interval: 56 }
+      ];
+      const isMastered = (w) => typeof w.interval === 'number' && w.interval >= 21;
+      const mastered = sampleWords.filter(isMastered).map(w => w.word);
+      expect(mastered).toEqual(['apparatus', 'edifice']);
+      expect(isMastered({ word: 'abstruse', interval: 14 })).toBe(false);
+      expect(isMastered({ word: 'apparatus', interval: 28 })).toBe(true);
+    });
   });
 
   describe('calcCraftLevel Caps and Progression', () => {

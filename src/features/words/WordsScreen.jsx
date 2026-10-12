@@ -44,7 +44,7 @@ export function WordsScreen({ isActive = true }) {
     { id: 'all', label: 'All', count: allWords.length, list: filterList(sortedAllWords), emptyText: 'No words in your dictionary yet.' },
     { id: 'due', label: 'Due', count: dueWords.length, list: filterList(dueWords), emptyText: 'Nothing due right now. The next review is in about 1 hour.' },
     { id: 'saved', label: 'Saved', count: savedWords.length, list: filterList(savedWords), emptyText: 'No saved words. Use “Save for later” after a lookup.' },
-    { id: 'mastered', label: 'Mastered', count: masteredWords.length, list: filterList(masteredWords), emptyText: 'No mastered words yet. Words reach Mastered after 14+ day intervals.' }
+    { id: 'mastered', label: 'Mastered', count: masteredWords.length, list: filterList(masteredWords), emptyText: 'No mastered words yet. Words reach Mastered after 21+ day intervals.' }
   ], [allWords, dueWords, savedWords, masteredWords, sortedAllWords, query]);
 
   const currentTabList = tabSets[activeTab]?.list || [];

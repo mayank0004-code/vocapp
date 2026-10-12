@@ -48,7 +48,7 @@ export function TodayScreen({
 
   // Target word for writing practice card
   const targetWord = useMemo(() => {
-    const unmastered = allWords.find(w => w.status !== 'mastered');
+    const unmastered = allWords.find(w => (w.interval || 0) < 21 && w.status !== 'mastered');
     return unmastered?.word || 'albeit';
   }, [allWords]);
 

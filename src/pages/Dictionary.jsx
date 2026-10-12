@@ -142,7 +142,7 @@ export default function Dictionary({ currentUser }) {
     }
 
     if (filter === 'Mastered') {
-      return words.filter(w => ((w.interval || 0) >= 21 || w.status === 'mastered') && matchesSearch(w));
+      return words.filter(w => (w.interval || 0) >= 21 && matchesSearch(w));
     }
 
     // Default 'All'

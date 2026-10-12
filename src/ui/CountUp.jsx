@@ -59,7 +59,7 @@ export function CountUp({
   }, [value, start, duration, enabled, prefix, suffix]);
 
   return (
-    <span ref={ref} className={className} style={style}>
+    <span ref={ref} className={className} style={{ font: 'inherit', color: 'inherit', ...style }}>
       {prefix}{enabled ? start : value}{suffix}
     </span>
   );

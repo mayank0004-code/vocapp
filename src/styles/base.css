@@ -441,6 +441,7 @@ button:disabled {
   letter-spacing: -0.03em;
   display: block;
   margin-top: 2px;
+  color: #FFFFFF;
 }
 .streakc small {
   font-size: 13.5px;
@@ -500,16 +501,26 @@ button:disabled {
   border: none;
   cursor: pointer;
 }
-.tile span {
-  font-size: 13px;
+.tile > span {
+  font-size: 13.5px;
   color: var(--fg3);
+  font-weight: 500;
+}
+.tile b,
+.tile b span,
+.tile .num,
+.tile .num span {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  color: #FFFFFF;
 }
 .tile b {
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  margin: 4px 0 2px;
 }
-.tile small {
+.tile small,
+.tile small span {
   font-size: 13px;
   color: var(--mute);
 }

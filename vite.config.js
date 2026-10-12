@@ -11,8 +11,8 @@ export default defineConfig({
         name: 'Vocapp',
         short_name: 'Vocapp',
         description: 'Apple-inspired vocabulary builder with spaced repetition.',
-        theme_color: '#fbfbfd',
-        background_color: '#fbfbfd',
+        theme_color: '#0B0B0D',
+        background_color: '#0B0B0D',
         display: 'standalone',
         icons: [
           {

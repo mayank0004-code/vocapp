@@ -1,46 +1,90 @@
 /**
- * Spring presets for framer-motion.
+ * Spring physics parameters and helpers for Vocapp Motion.
  *
- * RULE: damping >= 2 * sqrt(stiffness) for any preset that must NOT overshoot.
- * (Critical damping threshold, mass = 1.)
- *
- * Overshoot is EARNED. Only motion the user physically threw (sheet drag,
- * thrown card) may use an under-damped spring. Tapped things settle without bounce.
- *
- * Preset      Stiffness  Critical damping  Set damping  Ratio   Bouncy?
- * indicator   400        40               40           1.00    No  — tapped UI
- * reveal      300        34.6             35           1.01    No  — content arriving
- * sheet       260        32.2             26           0.81    Yes — drag earned it
- * thrown      200        28.3             20           0.71    Yes — flick earned it
- * press       —          —                —            —       No  — 100ms ease-out only
+ * Physics formula:
+ *   k = (2 * PI / response)^2
+ *   c = (4 * PI * damping) / response
  */
 
+export function springFromResponse(response, dampingRatio = 1.0) {
+  const stiffness = Math.pow((2 * Math.PI) / response, 2);
+  const damping = (4 * Math.PI * dampingRatio) / response;
+  return { type: 'spring', stiffness, damping, mass: 1 };
+}
+
 export const springs = {
-  // Tapped indicator (nav pill, toggles). No overshoot.
-  indicator: { type: 'spring', stiffness: 400, damping: 40 },
+  // Tapped UI (Tab indicator, skill highlight): response 0.42s, damping 0.86
+  indicator: { type: 'spring', stiffness: 224, damping: 26 },
+  tapped:    { type: 'spring', stiffness: 224, damping: 26 },
 
-  // Content or sheet revealing after a tap. No overshoot.
-  reveal: { type: 'spring', stiffness: 300, damping: 35 },
+  // Content, Pager snap, Page push: response 0.40s, damping 1.0 (critically damped)
+  content:   { type: 'spring', stiffness: 247, damping: 31 },
+  reveal:    { type: 'spring', stiffness: 247, damping: 31 },
 
-  // Sheet/drawer dismissal — user dragged it, slight bounce is earned.
-  sheet: { type: 'spring', stiffness: 260, damping: 26 },
+  // Bottom sheets: response 0.34s, damping 0.88
+  sheet:     { type: 'spring', stiffness: 342, damping: 33 },
 
-  // Thrown card — user physically flicked it, overshoot is earned.
-  thrown: { type: 'spring', stiffness: 200, damping: 20 },
+  // Thrown / Card fly-off: response 0.32s, damping 1.0 with release velocity
+  thrown:    { type: 'spring', stiffness: 386, damping: 39 },
+
+  // Spring back after short drag: response 0.40s, damping 0.68
+  springBack:{ type: 'spring', stiffness: 247, damping: 21 },
 };
 
-// Press feedback — not a spring. A button that wobbles under a finger is
-// worse than one that doesn't. Apply via CSS: transition: transform 100ms ease-out
-export const pressCss = 'transform 100ms ease-out';
+export const pressCss = 'transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1)';
 
 /**
  * Apple-style momentum projection.
  * Returns the projected resting distance from a release point.
- * Use to decide the snap target, then hand off releaseVelocity to the spring.
  *
- * @param {number} initialVelocity  px/s at release
+ * @param {number} initialVelocity px/s at release
  * @param {number} decelerationRate default 0.998 (scroll-feel)
  */
 export function project(initialVelocity, decelerationRate = 0.998) {
   return (initialVelocity / 1000) * decelerationRate / (1 - decelerationRate);
+}
+
+/**
+ * Apple-style rubber-banding formula for touch boundaries.
+ *
+ * @param {number} distance Over-drag distance in pixels
+ * @param {number} dimension Viewport/element dimension
+ * @param {number} coefficient Tension coefficient (default 0.55)
+ */
+export function rubber(distance, dimension = 350, coefficient = 0.55) {
+  return (distance * dimension * coefficient) / (dimension + coefficient * distance);
+}
+
+/**
+ * Velocity tracker for drag gestures.
+ */
+export class VelocityTracker {
+  constructor() {
+    this.history = [];
+  }
+
+  add(x, y = 0) {
+    const t = performance.now();
+    this.history.push({ x, y, t });
+    while (this.history.length > 2 && t - this.history[0].t > 100) {
+      this.history.shift();
+    }
+  }
+
+  get() {
+    const h = this.history;
+    if (h.length < 2) return { x: 0, y: 0 };
+    const a = h[0];
+    const b = h[h.length - 1];
+    if (performance.now() - b.t > 90) return { x: 0, y: 0 };
+    const dt = Math.max((b.t - a.t) / 1000, 0.008);
+    return {
+      x: (b.x - a.x) / dt,
+      y: (b.y - a.y) / dt
+    };
+  }
+
+  reset() {
+    this.history = [];
+  }
 }

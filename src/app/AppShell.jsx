@@ -1,56 +1,73 @@
 import React from 'react';
+import { DataProvider } from '../data/DataProvider';
+import Kit from '../pages/Kit';
+import '../styles/tokens.css';
+import '../styles/base.css';
 
 export default function AppShell({ currentUser, logout }) {
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#0B0B0D',
-      color: '#F4F3F0',
-      fontFamily: 'Geist, system-ui, sans-serif',
-      padding: '24px 16px',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      textAlign: 'center'
-    }}>
-      <h1 style={{ fontSize: '28px', fontWeight: 700, margin: '0 0 8px' }}>Vocapp v2</h1>
-      <p style={{ color: '#8E8E93', fontSize: '15px', maxWidth: '320px', margin: '0 0 24px' }}>
-        Foundations &amp; Redesign shell in progress.
-      </p>
-      <div style={{ display: 'flex', gap: '12px' }}>
-        <button
-          onClick={() => {
-            localStorage.setItem('vocapp.ui', 'v1');
-            window.location.search = '?ui=v1';
-          }}
+    <DataProvider currentUser={currentUser}>
+      <div style={{ position: 'relative' }}>
+        {/* Top Control Bar for Phase 1 Testing */}
+        <header
           style={{
-            padding: '10px 18px',
-            borderRadius: '12px',
-            background: '#1F1F22',
-            border: '1px solid rgba(255,255,255,0.1)',
-            color: '#F4F3F0',
-            fontWeight: 600,
-            cursor: 'pointer'
+            position: 'sticky',
+            top: 0,
+            zIndex: 50,
+            background: 'rgba(22, 22, 24, 0.85)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderBottom: '1px solid var(--line)',
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '13px'
           }}
         >
-          Return to Classic UI
-        </button>
-        <button
-          onClick={logout}
-          style={{
-            padding: '10px 18px',
-            borderRadius: '12px',
-            background: 'rgba(255,107,107,0.15)',
-            border: 'none',
-            color: '#FF8A80',
-            fontWeight: 600,
-            cursor: 'pointer'
-          }}
-        >
-          Sign Out
-        </button>
+          <span style={{ color: 'var(--acc2)', fontWeight: 600 }}>
+            Vocapp v2 · Phase 1 Kit
+          </span>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              onClick={() => {
+                localStorage.setItem('vocapp.ui', 'v1');
+                window.location.search = '?ui=v1';
+              }}
+              style={{
+                background: 'var(--card2)',
+                color: 'var(--fg)',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                border: '1px solid var(--line)',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              Classic UI
+            </button>
+            <button
+              onClick={logout}
+              style={{
+                background: 'var(--badbg)',
+                color: 'var(--bad)',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                border: 'none',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                cursor: 'pointer'
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        </header>
+
+        {/* Phase 1 Foundations & Component Kit */}
+        <Kit />
       </div>
-    </div>
+    </DataProvider>
   );
 }

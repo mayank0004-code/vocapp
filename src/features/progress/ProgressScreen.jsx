@@ -8,7 +8,7 @@ import { AnthologyPage } from '../practice/AnthologyPage';
 import { DrillPage } from '../practice/DrillPage';
 import { useLayout } from '../../motion/useLayout';
 import { useTabActivation } from '../../motion/useTabActivation';
-import { useCountUp } from '../../motion/useCountUp';
+import CountUp from '../../ui/CountUp';
 
 const HABITS = [
   {
@@ -69,15 +69,6 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
 
   const [scrollTop, setScrollTop] = useState(0);
   const [xpBarFilled, setXpBarFilled] = useState(false);
-
-  // Animated counters on tab activation
-  const animatedWordsCount = useCountUp(allWords.length || 84, { enabled: isActive, duration: 700 });
-  const animatedMasteredCount = useCountUp(masteredWords.length || 12, { enabled: isActive, duration: 700 });
-  const animatedDrillsSolved = useCountUp(stats?.drillsDone || stats?.drills || 12, { enabled: isActive, duration: 700 });
-  const animatedAccuracy = useCountUp(82, { enabled: isActive, duration: 750 });
-  const animatedVaultSlips = useCountUp(openMistakes.length || 3, { enabled: isActive, duration: 700 });
-  const animatedFixedSlips = useCountUp(fixedMistakes.length || 5, { enabled: isActive, duration: 700 });
-  const animatedStreak = useCountUp(effectiveStreak, { enabled: isActive, duration: 600, startValue: 0 });
 
   // XP bar animation trigger
   React.useEffect(() => {
@@ -168,7 +159,7 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
         <div>
           <span className="lab">Streak</span>
           <span className="big num">
-            {animatedStreak} {animatedStreak === 1 ? 'day' : 'days'}
+            <CountUp value={effectiveStreak} enabled={isActive} duration={600} /> {effectiveStreak === 1 ? 'day' : 'days'}
           </span>
           <small>Best: {highestStreak} days · 1 streak freeze ready</small>
         </div>
@@ -224,8 +215,12 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
         }}
       >
         <span>Words</span>
-        <b className="num">{animatedWordsCount}</b>
-        <small>{animatedMasteredCount} mastered</small>
+        <b className="num">
+          <CountUp value={allWords.length || 84} enabled={isActive} duration={700} />
+        </b>
+        <small>
+          <CountUp value={masteredWords.length || 12} enabled={isActive} duration={700} /> mastered
+        </small>
       </button>
 
       <button
@@ -237,7 +232,9 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
         }}
       >
         <span>Drills solved</span>
-        <b className="num">{animatedDrillsSolved}</b>
+        <b className="num">
+          <CountUp value={stats?.drillsDone || stats?.drills || 12} enabled={isActive} duration={700} />
+        </b>
         <small>across 4 skills</small>
       </button>
 
@@ -250,7 +247,9 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
         }}
       >
         <span>Accuracy</span>
-        <b className="num">{animatedAccuracy}%</b>
+        <b className="num">
+          <CountUp value={82} suffix="%" enabled={isActive} duration={750} />
+        </b>
         <small>last 30 days</small>
       </button>
 
@@ -260,8 +259,12 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
         onClick={handleOpenVault}
       >
         <span>Vault slips</span>
-        <b className="num">{animatedVaultSlips}</b>
-        <small>{animatedFixedSlips} fixed</small>
+        <b className="num">
+          <CountUp value={openMistakes.length || 3} enabled={isActive} duration={700} />
+        </b>
+        <small>
+          <CountUp value={fixedMistakes.length || 5} enabled={isActive} duration={700} /> fixed
+        </small>
       </button>
     </div>
   );

@@ -39,10 +39,10 @@ export function WordRow({
         userSelect: 'none',
         WebkitUserSelect: 'none',
         transition: 'background 0.2s ease',
-        '--i': Math.min(index, 6),
+        '--i': Math.min(index, 10),
         ...style
       }}
-      className={`wrow ${index < 6 ? 'card-cascade' : ''}`}
+      className={`wrow ${index < 10 ? 'rise' : ''}`}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>

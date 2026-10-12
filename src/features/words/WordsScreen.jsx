@@ -221,7 +221,7 @@ export function WordsScreen({ isActive = true }) {
             <div key={tab.id} style={{ padding: '14px 16px 8px' }}>
               {tab.list.length > 0 ? (
                 <div
-                  key={`list-${tab.id}`}
+                  key={`list-${tab.id}-${activationKey}`}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -314,7 +314,9 @@ export function WordsScreen({ isActive = true }) {
           }}
         >
           {activeSelectedWord ? (
-            <WordDetailPage word={activeSelectedWord} isInline={true} />
+            <div key={`detail-${activeSelectedWord.word}-${activationKey}`} className="card-cascade" style={{ height: '100%' }}>
+              <WordDetailPage word={activeSelectedWord} isInline={true} />
+            </div>
           ) : (
             <div
               style={{

@@ -39,6 +39,29 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
   const [scrollTop, setScrollTop] = useState(0);
   const [wigglingTier, setWigglingTier] = useState(null);
   const [barsFilled, setBarsFilled] = useState(false);
+  const gridRef = React.useRef(null);
+  const [hlPos, setHlPos] = useState({ x: 0, y: 0, width: 0, height: 0, ready: false });
+
+  React.useLayoutEffect(() => {
+    const updateHl = () => {
+      if (!gridRef.current) return;
+      const buttons = gridRef.current.querySelectorAll('.skc');
+      const target = buttons[selectedSkill];
+      if (target) {
+        setHlPos({
+          x: target.offsetLeft,
+          y: target.offsetTop,
+          width: target.offsetWidth,
+          height: target.offsetHeight,
+          ready: true
+        });
+      }
+    };
+    updateHl();
+    const ro = new ResizeObserver(updateHl);
+    if (gridRef.current) ro.observe(gridRef.current);
+    return () => ro.disconnect();
+  }, [selectedSkill, activationKey]);
 
   // Trigger skill progress bar fill and stagger on tab activation
   React.useEffect(() => {
@@ -287,7 +310,29 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
         </h2>
 
         {/* 4-Skill Grid with Glide Highlight */}
-        <div key={`skills-${activationKey}`} className="skgrid" role="tablist" aria-label="Skill">
+        <div ref={gridRef} key={`skills-${activationKey}`} className="skgrid" role="tablist" aria-label="Skill">
+          {hlPos.ready && (
+            <m.span
+              className="skhl"
+              animate={{
+                x: hlPos.x,
+                y: hlPos.y,
+                width: hlPos.width,
+                height: hlPos.height
+              }}
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                pointerEvents: 'none',
+                zIndex: 2,
+                borderRadius: '18px',
+                border: '2px solid var(--acc)',
+                boxShadow: '0 0 0 4px rgba(124, 136, 255, 0.12), 0 8px 30px rgba(124, 136, 255, 0.18)'
+              }}
+            />
+          )}
           {SKILLS.map((s, i) => {
             const isSelected = selectedSkill === i;
             return (
@@ -296,23 +341,13 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
                 role="tab"
                 aria-selected={isSelected}
                 onClick={() => handleSelectSkill(i)}
-                className="skc press card-cascade"
+                className="skc card-cascade"
                 style={{
                   position: 'relative',
-                  border: isSelected ? '1px solid var(--acc)' : '1px solid var(--card2)',
-                  boxShadow: isSelected ? '0 0 0 3px rgba(124,136,255,0.12)' : 'none',
-                  transition: 'border 0.25s, box-shadow 0.25s',
+                  border: '1px solid var(--card2)',
                   '--i': i
                 }}
               >
-                {isSelected && (
-                  <m.span
-                    layoutId="skhl"
-                    transition={springs.indicator}
-                    className="skhl"
-                    style={{ inset: -2 }}
-                  />
-                )}
                 <div className="r1">
                   <b>{s.name}</b>
                   <span className="lv">Lvl {s.level}</span>

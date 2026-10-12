@@ -14,8 +14,8 @@ export function Capture({
   const { currentUser } = useData();
   const { allWords, savedWords } = useWords();
 
-  const [inputWord, setInputWord] = useState('albiet');
-  const [contextInput, setContextInput] = useState('The reforms worked, albiet slowly.');
+  const [inputWord, setInputWord] = useState('');
+  const [contextInput, setContextInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -168,7 +168,7 @@ export function Capture({
         <input
           id="capIn"
           className={`inp ${shake ? 'shake' : ''}`}
-          placeholder="Type or paste it"
+          placeholder=""
           value={inputWord}
           onChange={(e) => setInputWord(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
@@ -191,7 +191,7 @@ export function Capture({
         <input
           id="capCtx"
           className="inp sm"
-          placeholder="Optional: the sentence you saw it in"
+          placeholder=""
           aria-label="Sentence where you found it (optional)"
           value={contextInput}
           onChange={(e) => setContextInput(e.target.value)}

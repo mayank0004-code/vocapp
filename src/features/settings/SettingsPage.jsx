@@ -538,8 +538,10 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
               size="sm"
               variant="ghost"
               onClick={() => {
-                localStorage.setItem('vocapp.ui', 'v1');
-                window.location.search = '?ui=v1';
+                if (window.confirm('Switch back to the classic interface? You can return anytime with the "Updated UI" button.')) {
+                  localStorage.setItem('vocapp.ui', 'v1');
+                  window.location.search = '?ui=v1';
+                }
               }}
               style={{
                 background: 'var(--card2)',

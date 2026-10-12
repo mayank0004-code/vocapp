@@ -214,7 +214,32 @@ export default function Dashboard({ currentUser, logout }) {
           />
 
           {/* Right controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+            {/* Quick Switch to Updated UI */}
+            <button
+              onClick={() => {
+                localStorage.setItem('vocapp.ui', 'v2');
+                window.location.href = window.location.origin + window.location.pathname + '?ui=v2';
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '6px 12px',
+                borderRadius: '100px',
+                background: 'rgba(124, 136, 255, 0.16)',
+                border: '1px solid rgba(124, 136, 255, 0.4)',
+                color: 'var(--color-primary, #7C88FF)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+              title="Switch to modern Vocapp v2 UI"
+            >
+              <span>✨ Updated UI</span>
+            </button>
+
             {/* Streak — tappable to explain itself */}
             {stats.currentStreak > 0 && (
               <div style={{ position: 'relative' }}>

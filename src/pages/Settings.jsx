@@ -588,9 +588,29 @@ export default function Settings({ currentUser, closeSettings, logout, initialTa
             <TabButton id="account" active={activeTab} setActive={setActiveTab} icon="👤" label="Account" />
           </nav>
 
-          <div style={{ padding: 'var(--sp-5)', textAlign: 'center', opacity: 0.8 }}>
-            <AppLogo size={32} variant="badge" style={{ marginBottom: 'var(--sp-2)' }} />
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>Vocapp</div>
+          <div style={{ padding: 'var(--sp-4)', textAlign: 'center' }}>
+            <button
+              onClick={() => {
+                localStorage.setItem('vocapp.ui', 'v2');
+                window.location.href = window.location.origin + window.location.pathname + '?ui=v2';
+              }}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: '10px',
+                background: 'rgba(124, 136, 255, 0.16)',
+                border: '1px solid rgba(124, 136, 255, 0.4)',
+                color: 'var(--color-primary, #7C88FF)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                marginBottom: '12px'
+              }}
+            >
+              ✨ Switch to Vocapp v2
+            </button>
+            <AppLogo size={28} variant="badge" style={{ marginBottom: 'var(--sp-1)' }} />
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Vocapp Classic</div>
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Version 1.0.0</div>
           </div>
         </div>

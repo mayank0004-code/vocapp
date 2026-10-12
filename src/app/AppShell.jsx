@@ -7,16 +7,21 @@ import TodayScreen from '../features/today/TodayScreen';
 import WordsScreen from '../features/words/WordsScreen';
 import Kit from '../pages/Kit';
 import { ToastContainer, showToast } from '../ui/Toast';
+import SessionOverlay from '../features/session/SessionOverlay';
 import '../styles/tokens.css';
 import '../styles/base.css';
 
 function ShellContent({ currentUser, logout }) {
   const [activeTab, setActiveTab] = useState(0); // Default to Today
+  const [sessionConfig, setSessionConfig] = useState({ isOpen: false, mode: 'full', payload: {} });
   const { isTabBarHidden } = useNav();
 
   const handleStartSession = (mode = 'full', payload = {}) => {
-    const modeName = mode === 'reviews' ? 'Reviews' : mode === 'drills' ? 'Drills' : mode === 'practice-word' ? `Practice: ${payload.word}` : 'Full Session';
-    showToast(`Session starting (${modeName}) · Stage runner lands in Phase 4`);
+    setSessionConfig({ isOpen: true, mode, payload });
+  };
+
+  const handleCloseSession = () => {
+    setSessionConfig(prev => ({ ...prev, isOpen: false }));
   };
 
   return (
@@ -31,6 +36,19 @@ function ShellContent({ currentUser, logout }) {
       }}
     >
       <ToastContainer />
+
+      {/* Fullscreen Session Overlay */}
+      <SessionOverlay
+        isOpen={sessionConfig.isOpen}
+        mode={sessionConfig.mode}
+        targetWord={sessionConfig.payload?.word || 'albeit'}
+        weakWords={sessionConfig.payload?.weak || []}
+        onClose={handleCloseSession}
+        onGoToWords={() => {
+          handleCloseSession();
+          setActiveTab(2);
+        }}
+      />
 
       {/* Top Testing Control Bar */}
       <header

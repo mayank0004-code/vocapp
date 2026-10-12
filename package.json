@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "test": "vitest run",
     "deploy": "PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" firebase deploy",
     "deploy:hosting": "HOST=127.0.0.1 npx firebase-tools deploy --only hosting"
   },
@@ -25,6 +26,7 @@
     "oxlint": "^1.79.0",
     "vite": "^8.2.2",
     "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^5.0.4",
     "wtfnode": "^0.10.1"
   },
   "allowScripts": {

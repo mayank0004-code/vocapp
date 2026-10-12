@@ -54,12 +54,11 @@ export function WordsScreen() {
 
   return (
     <div
+      className="scroller"
       style={{
-        minHeight: '100%',
         background: 'var(--bg)',
         color: 'var(--fg)',
-        fontFamily: 'var(--sans)',
-        paddingBottom: '124px'
+        fontFamily: 'var(--sans)'
       }}
     >
       {/* Top Header */}

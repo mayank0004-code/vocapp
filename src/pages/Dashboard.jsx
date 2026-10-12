@@ -9,6 +9,7 @@ import Settings from './Settings';
 import AppLogo from '../components/AppLogo';
 import { listenToUserStats, listenToPendingWords } from '../services/db';
 import { springs } from '../motion/springs';
+import '../index.css';
 
 /* ── Icons ────────────────────────────────────────────────── */
 const Icon = ({ path, size = 24, color = 'currentColor', fill = 'none', label }) => (

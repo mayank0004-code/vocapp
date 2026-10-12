@@ -4,7 +4,6 @@ import { auth, provider } from './firebase';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AppShell from './app/AppShell';
-import './index.css';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);

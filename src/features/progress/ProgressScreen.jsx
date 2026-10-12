@@ -138,16 +138,12 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
 
   return (
     <div
+      className="scroller"
       onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
       style={{
-        minHeight: '100%',
         background: 'var(--bg)',
         color: 'var(--fg)',
-        fontFamily: 'var(--sans)',
-        paddingBottom: '124px',
-        position: 'relative',
-        overflowY: 'auto',
-        WebkitOverflowScrolling: 'touch'
+        fontFamily: 'var(--sans)'
       }}
     >
       {/* Frosted Topbar Interpolation */}

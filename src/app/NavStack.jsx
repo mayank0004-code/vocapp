@@ -43,59 +43,51 @@ export function NavStackProvider({ children }) {
 
   const topPage = stack[stack.length - 1] || null;
   const isTabBarHidden = !!topPage?.hideTab;
+  const hasPushed = stack.length > 0;
 
   return (
-    <NavStackContext.Provider value={{ push, pop, popToRoot, stack, topPage, isTabBarHidden }}>
-      <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden' }}>
-        {/* Root content */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            transform: stack.length > 0 ? 'scale(0.96) translate3d(-20px, 0, 0)' : 'none',
-            opacity: stack.length > 0 ? 0.6 : 1,
-            transition: 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease',
-            pointerEvents: stack.length > 0 ? 'none' : 'auto'
-          }}
-        >
-          {children}
-        </div>
-
-        {/* Pushed Pages Stack */}
-        <AnimatePresence>
-          {stack.map((page, index) => {
-            const isTop = index === stack.length - 1;
-            const Component = page.component;
-
-            return (
-              <m.div
-                key={page.key || page.id || index}
-                initial={{ x: '100%' }}
-                animate={{
-                  x: isTop ? '0%' : '-20%',
-                  opacity: isTop ? 1 : 0.6,
-                  scale: isTop ? 1 : 0.98
-                }}
-                exit={{ x: '100%' }}
-                transition={springs.content}
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'var(--bg)',
-                  zIndex: 20 + index,
-                  boxShadow: '-24px 0 48px rgba(0,0,0,0.45)',
-                  overflowY: 'auto',
-                  WebkitOverflowScrolling: 'touch',
-                  paddingBottom: page.hideTab ? '40px' : '96px'
-                }}
-              >
-                <Component {...page.props} onBack={pop} />
-              </m.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
+    <NavStackContext.Provider value={{ push, pop, popToRoot, stack, topPage, isTabBarHidden, hasPushed }}>
+      {children}
     </NavStackContext.Provider>
+  );
+}
+
+export function NavPagesLayer() {
+  const { stack, pop } = useNav();
+
+  return (
+    <AnimatePresence>
+      {stack.map((page, index) => {
+        const isTop = index === stack.length - 1;
+        const Component = page.component;
+
+        return (
+          <m.div
+            key={page.key || page.id || index}
+            initial={{ x: '100%' }}
+            animate={{
+              x: isTop ? '0%' : '-20%',
+              opacity: isTop ? 1 : 0.6,
+              scale: isTop ? 1 : 0.98
+            }}
+            exit={{ x: '100%' }}
+            transition={springs.content}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'var(--bg)',
+              zIndex: 35 + index,
+              boxShadow: '-24px 0 48px rgba(0,0,0,0.45)',
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              paddingBottom: page.hideTab ? '40px' : '96px'
+            }}
+          >
+            <Component {...page.props} onBack={pop} />
+          </m.div>
+        );
+      })}
+    </AnimatePresence>
   );
 }
 

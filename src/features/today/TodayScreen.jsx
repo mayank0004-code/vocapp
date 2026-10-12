@@ -12,7 +12,8 @@ import SettingsPage from '../settings/SettingsPage';
 
 export function TodayScreen({
   onSwitchTab = () => {},
-  onStartSession = () => {}
+  onStartSession = () => {},
+  onSignOut = () => {}
 }) {
   const { currentUser } = useData();
   const { dueWords, savedWords, allWords } = useWords();
@@ -52,6 +53,7 @@ export function TodayScreen({
       id: 'settings-screen',
       title: 'Settings',
       component: SettingsPage,
+      props: { onSignOut },
       hideTab: true
     });
   };
@@ -71,14 +73,12 @@ export function TodayScreen({
 
   return (
     <div
+      className="scroller"
       onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
       style={{
-        minHeight: '100%',
         background: 'var(--bg)',
         color: 'var(--fg)',
-        fontFamily: 'var(--sans)',
-        paddingBottom: '124px',
-        position: 'relative'
+        fontFamily: 'var(--sans)'
       }}
     >
       {/* Dynamic Frosted Topbar */}

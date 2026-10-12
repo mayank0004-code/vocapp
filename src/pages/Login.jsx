@@ -3,6 +3,7 @@
  */
 import React, { useState } from 'react';
 import AppLogo from '../components/AppLogo';
+import '../index.css';
 
 export default function Login({ login }) {
   const [error, setError] = useState(null);

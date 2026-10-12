@@ -500,7 +500,59 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
           )}
         </div>
 
-        <p className="foot" style={{ marginBottom: '16px' }}>
+        {/* About Section with Classic UI Fallback */}
+        <div style={{ marginTop: '32px' }}>
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'var(--mute)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              marginBottom: '8px'
+            }}
+          >
+            About
+          </div>
+          <div
+            style={{
+              background: 'var(--card)',
+              borderRadius: '16px',
+              border: '1px solid var(--line)',
+              padding: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '15px', fontWeight: 500, color: 'var(--fg)' }}>
+                Vocapp v2
+              </div>
+              <div style={{ fontSize: '12.5px', color: 'var(--mute)' }}>
+                Switch back to classic interface
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                localStorage.setItem('vocapp.ui', 'v1');
+                window.location.search = '?ui=v1';
+              }}
+              style={{
+                background: 'var(--card2)',
+                border: '1px solid var(--line)',
+                flexShrink: 0
+              }}
+            >
+              Classic UI
+            </Button>
+          </div>
+        </div>
+
+        <p className="foot" style={{ marginBottom: '16px', marginTop: '24px' }}>
           Vocapp
         </p>
       </div>

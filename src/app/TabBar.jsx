@@ -151,10 +151,10 @@ export function TabBar({
       }}
       transition={springs.indicator}
       style={{
-        position: 'fixed',
+        position: 'absolute',
         left: '14px',
         right: '14px',
-        bottom: '22px',
+        bottom: 'calc(22px + env(safe-area-inset-bottom, 0px))',
         maxWidth: '430px',
         margin: '0 auto',
         height: '64px',

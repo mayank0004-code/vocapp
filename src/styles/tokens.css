@@ -43,7 +43,7 @@
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* Layout & Insets */
-  --sb: env(safe-area-inset-top, 44px);
+  --sb: env(safe-area-inset-top, 0px);
   --topH: calc(var(--sb) + 48px);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);

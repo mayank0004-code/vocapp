@@ -174,7 +174,7 @@ export function SessionCard({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', fontSize: '12px', color: 'var(--mute)' }}>
           {dayNames.map((name, idx) => {
             const isToday = idx === todayDayIdx;
-            const isCompleted = isToday ? streak >= 1 : idx < todayDayIdx;
+            const isCompleted = isToday ? isSessionDone : idx < todayDayIdx;
 
             return (
               <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
@@ -204,8 +204,8 @@ export function SessionCard({
           })}
         </div>
         <p style={{ margin: 0, fontSize: '13px', color: 'var(--fg3)', textAlign: 'center' }}>
-          {streak >= 2
-            ? `${streak}-day streak · best ${highestStreak}. See you tomorrow.`
+          {isSessionDone
+            ? `${Math.max(2, streak)}-day streak · best ${highestStreak}. See you tomorrow.`
             : `Finish today to make it a 2-day streak · best ${highestStreak}`}
         </p>
       </div>

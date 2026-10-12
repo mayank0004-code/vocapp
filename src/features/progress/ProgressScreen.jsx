@@ -48,14 +48,24 @@ const SKILLS_INFO = [
   { name: 'Punctuation', level: 1, pct: 15 }
 ];
 
+const SPEC_DATA = [
+  { name: 'Context', k: 2, count: 15, pct: 65, org: true },
+  { name: 'Flow', k: 1, count: 6, pct: 26 },
+  { name: 'Grammar', k: 0, count: 2, pct: 9 },
+  { name: 'Punctuation', k: 3, count: 0, pct: 0 }
+];
+
 export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
   const { activationKey } = useTabActivation(isActive);
   const { allWords = [], masteredWords = [] } = useWords();
-  const { stats, currentStreak = 1, highestStreak = 30, craftLevelInfo } = useStats();
+  const { stats, todayPlan, currentStreak = 1, highestStreak = 30, craftLevelInfo } = useStats();
   const { openMistakes = [], fixedMistakes = [], allMistakes = [] } = useVault();
   const { anthology = [] } = useAnthology();
   const { push } = useNav();
   const { isLaptop, isTablet } = useLayout();
+
+  const isTodayDone = !!(todayPlan && todayPlan.itemsDone >= 12);
+  const effectiveStreak = isTodayDone ? Math.max(2, currentStreak) : 1;
 
   const [scrollTop, setScrollTop] = useState(0);
   const [xpBarFilled, setXpBarFilled] = useState(false);
@@ -67,7 +77,7 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
   const animatedAccuracy = useCountUp(82, { enabled: isActive, duration: 750 });
   const animatedVaultSlips = useCountUp(openMistakes.length || 3, { enabled: isActive, duration: 700 });
   const animatedFixedSlips = useCountUp(fixedMistakes.length || 5, { enabled: isActive, duration: 700 });
-  const animatedStreak = useCountUp(currentStreak, { enabled: isActive, duration: 600, startValue: 0 });
+  const animatedStreak = useCountUp(effectiveStreak, { enabled: isActive, duration: 600, startValue: 0 });
 
   // XP bar animation trigger
   React.useEffect(() => {
@@ -141,15 +151,15 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
       let state = '';
       if (dayOfMonth < 1 || dayOfMonth > 31) {
         state = 'x'; // outside month
-      } else if (dayOfMonth === 11 || (stats?.activeDates && stats.activeDates.includes(dayOfMonth))) {
+      } else if (dayOfMonth === 11 || dayOfMonth === 12 || (stats?.activeDates && stats.activeDates.includes(dayOfMonth))) {
         state = 'on';
       } else if (dayOfMonth === todayDate) {
-        state = currentStreak >= 2 ? 'on' : 'today';
+        state = isTodayDone ? 'on' : 'today';
       }
       cells.push({ index: i, state });
     }
     return cells;
-  }, [stats?.activeDates, currentStreak]);
+  }, [stats?.activeDates, isTodayDone]);
 
   // Sub-components for flexible multi-column rendering
   const StreakCard = (
@@ -162,9 +172,28 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
           </span>
           <small>Best: {highestStreak} days · 1 streak freeze ready</small>
         </div>
-        <span style={{ color: 'var(--warn)', marginTop: '4px' }} className="ring-pop">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+        <span style={{ color: 'var(--warn)', marginTop: '4px' }}>
+          <svg
+            className="flame"
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            style={{
+              filter: 'drop-shadow(0 2px 8px rgba(255, 110, 0, 0.45))'
+            }}
+          >
+            <defs>
+              <linearGradient id="streakFlameGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+                <stop offset="0%" stopColor="#FF4500" />
+                <stop offset="55%" stopColor="#FF9500" />
+                <stop offset="100%" stopColor="#FFD000" />
+              </linearGradient>
+            </defs>
+            <path
+              fill="url(#streakFlameGrad)"
+              d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"
+            />
           </svg>
         </span>
       </div>
@@ -238,70 +267,106 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
   );
 
   const RankCard = (
-    <section key={`rank-${activationKey}`} className="pcard rankc card-cascade" aria-label="Writing level" style={{ margin: 0, '--i': 1 }}>
-      <div className="hd">
-        <h2>Writing level · {rank}</h2>
-        <span>L{levelNum}</span>
+    <section key={`rank-${activationKey}`} className="pcard rank card-cascade" aria-label="Writing level" style={{ margin: 0, '--i': 1 }}>
+      <div className="r1">
+        <span>Writing rank 2 of 5</span>
+        <b>{rank}</b>
       </div>
-      <p className="rsub">{rankText}</p>
-      <div className="xpbar">
+      <span className="bar">
         <i
           style={{
-            width: xpBarFilled ? `${Math.min(100, Math.max(10, (xp / 600) * 100))}%` : '0%',
+            width: xpBarFilled ? `${Math.min(100, Math.max(10, (xp / 300) * 100))}%` : '0%',
             transition: 'width 0.85s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
         />
-      </div>
-
-      <div className="lgrid">
-        {SKILLS_INFO.map((s) => (
-          <div key={s.name} className="c">
-            <span className="nm">{s.name}</span>
-            <span className="lv">L{s.level}</span>
-            <span className="bar">
-              <i style={{ width: `${s.pct}%` }} />
-            </span>
-          </div>
+      </span>
+      <small>{rankText}</small>
+      <ul className="skl">
+        {SKILLS_INFO.map((s, i) => (
+          <li key={s.name}>
+            <button className="press" onClick={() => handlePracticeSkill(i)}>
+              <div className="grow">
+                <div className="r">
+                  <b style={{ fontWeight: 500 }}>{s.name}</b>
+                  <span>Level {s.level}</span>
+                </div>
+                <span className="bar">
+                  <i style={{ width: xpBarFilled ? `${s.pct}%` : '0%', transition: 'width 0.85s cubic-bezier(0.16, 1, 0.3, 1)' }} />
+                </span>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--mute)', flexShrink: 0, marginLeft: '6px' }}>
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 
   const SlipsCard = (
-    <section className="pcard slips" aria-label="Where your slips happen" style={{ margin: 0 }}>
+    <section key={`slips-${activationKey}`} className="pcard spec card-cascade" aria-label="Where your slips happen" style={{ margin: 0, '--i': 2 }}>
       <div className="hd">
         <h2>Where your slips happen</h2>
         <span>{totalSlips} total</span>
       </div>
       <div className="sbar" aria-hidden="true">
-        <span style={{ width: '42%' }} className="g" title="Grammar 42%" />
-        <span style={{ width: '28%' }} className="c" title="Context 28%" />
-        <span style={{ width: '18%' }} className="f" title="Flow 18%" />
-        <span style={{ width: '12%' }} className="p" title="Punctuation 12%" />
+        <span style={{ width: '42%', background: '#7C88FF' }} title="Grammar 42%" />
+        <span style={{ width: '28%', background: '#FF9F2E' }} title="Context 28%" />
+        <span style={{ width: '18%', background: '#5BD69B' }} title="Flow 18%" />
+        <span style={{ width: '12%', background: '#B9C0FF' }} title="Punctuation 12%" />
       </div>
       <div className="leg">
-        <span><i className="g" />Grammar 42%</span>
-        <span><i className="c" />Context 28%</span>
-        <span><i className="f" />Flow 18%</span>
-        <span><i className="p" />Punctuation 12%</span>
+        <span><i style={{ background: '#7C88FF' }} />Grammar 42%</span>
+        <span><i style={{ background: '#FF9F2E' }} />Context 28%</span>
+        <span><i style={{ background: '#5BD69B' }} />Flow 18%</span>
+        <span><i style={{ background: '#B9C0FF' }} />Punctuation 12%</span>
+      </div>
+      <div style={{ marginTop: '14px', borderTop: '0.5px solid var(--line)', paddingTop: '6px' }}>
+        {SPEC_DATA.map((p) => (
+          <button key={p.name} className="press" onClick={() => handlePracticeSkill(p.k)}>
+            <div className="r">
+              <span style={{ color: 'var(--fg)' }}>{p.name}</span>
+              <span>{p.count} · {p.pct}%</span>
+            </div>
+            <span className={`bar ${p.org ? 'org' : ''}`} style={{ width: '100%' }}>
+              <i style={{ width: xpBarFilled ? `${p.pct}%` : '0%', transition: 'width 0.85s cubic-bezier(0.16, 1, 0.3, 1)' }} />
+            </span>
+          </button>
+        ))}
       </div>
     </section>
   );
 
   const FocusCard = (
-    <section className="focusc" aria-label="Focus area" style={{ margin: 0 }}>
-      <span className="lab">Focus area</span>
-      <h2>Context · collocation mismatches</h2>
-      <p>You know what the words mean; the trap is using them where a native ear expects a different verb.</p>
+    <section key={`focus-${activationKey}`} className="pcard focus card-cascade" aria-label="Focus area" style={{ margin: 0, '--i': 3 }}>
+      <span className="lab">Focus area · Context &amp; register</span>
+      <h2>Put each word where it feels at home</h2>
+      <p>Most of your slips come from formal words in casual sentences, or stiff phrasing where plain words would do.</p>
+      <div className="two">
+        <div>
+          <b>Say who did it</b>
+          <span>“We decided”, not “a decision was made”.</span>
+        </div>
+        <div>
+          <b>Match the room</b>
+          <span>Formal words for formal writing.</span>
+        </div>
+      </div>
+      <div className="ex">
+        <span>From your practice with “veil”</span>
+        <span className="o">✗ A veil of secrecy was put by the company on the deal.</span>
+        <span className="b">✓ The company drew a veil of secrecy over the deal.</span>
+      </div>
       <Button
-        variant="primary"
+        variant="pri"
         size="sm"
         onClick={() => handlePracticeSkill(2)}
         style={{
           alignSelf: 'flex-start',
           width: 'auto',
           padding: '0 20px',
-          marginTop: '6px'
+          marginTop: '4px'
         }}
       >
         Practise Context

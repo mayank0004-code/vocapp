@@ -221,7 +221,7 @@ export function WordsScreen({ isActive = true }) {
             <div key={tab.id} style={{ padding: '14px 16px 8px' }}>
               {tab.list.length > 0 ? (
                 <div
-                  key={`list-${tab.id}-${activationKey}`}
+                  key={`list-${tab.id}`}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -236,7 +236,7 @@ export function WordsScreen({ isActive = true }) {
                     const isSelected = isLaptop && activeSelectedWord?.word === wordItem.word;
                     return (
                       <div
-                        key={`${wordItem.word || wordItem.id}-${activationKey}-${tab.id}`}
+                        key={`${wordItem.word || wordItem.id}-${tab.id}`}
                         style={{
                           background: isSelected ? 'var(--card2)' : 'transparent',
                           transition: 'background 0.15s'

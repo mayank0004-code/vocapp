@@ -32,9 +32,9 @@ export function SwipeTabs({
       <div
         style={{
           position: 'sticky',
-          top: 'var(--topH)',
+          top: 0,
           zIndex: 4,
-          background: 'rgba(11, 11, 13, 0.84)',
+          background: 'rgba(11, 11, 13, 0.92)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderBottom: '0.5px solid var(--line)'

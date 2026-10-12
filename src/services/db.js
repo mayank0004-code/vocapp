@@ -1311,4 +1311,39 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+export async function recordTodayProgress(userId, kind) {
+  if (!userId) return;
+  try {
+    const now = new Date();
+    const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    const statsRef = doc(db, 'users', userId, 'profile', 'stats');
+    const snap = await getDoc(statsRef);
+    const data = snap.exists() ? snap.data() : {};
+
+    let today = data.today && data.today.date === todayStr ? { ...data.today } : {
+      date: todayStr,
+      reviewsDone: 0,
+      drillsDone: 0,
+      wordWritten: false
+    };
+
+    if (kind === 'review') {
+      today.reviewsDone = (today.reviewsDone || 0) + 1;
+    } else if (kind === 'drill') {
+      today.drillsDone = (today.drillsDone || 0) + 1;
+    } else if (kind === 'word') {
+      today.wordWritten = true;
+    }
+
+    await setDoc(statsRef, {
+      today,
+      lastPracticedDate: todayStr,
+      activeDates: arrayUnion(todayStr)
+    }, { merge: true });
+  } catch (error) {
+    console.error("Error recording today progress:", error);
+  }
+}
+
+
 

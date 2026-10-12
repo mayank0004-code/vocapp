@@ -39,10 +39,10 @@ export function WordRow({
         userSelect: 'none',
         WebkitUserSelect: 'none',
         transition: 'background 0.2s ease',
-        '--i': Math.min(index, 12),
+        '--i': Math.min(index, 6),
         ...style
       }}
-      className="wrow card-cascade"
+      className={`wrow ${index < 6 ? 'card-cascade' : ''}`}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
@@ -88,7 +88,7 @@ export function WordRow({
       </div>
 
       {!isSaved && (
-        <StrengthBars strength={strength} animate={true} />
+        <StrengthBars strength={strength} animate={index < 4} />
       )}
     </m.div>
   );

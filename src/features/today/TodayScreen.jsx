@@ -22,6 +22,8 @@ export function TodayScreen({
   const { currentUser } = useData();
   const { dueWords, savedWords, allWords } = useWords();
   const { stats, todayPlan, currentStreak, highestStreak } = useStats();
+  const isTodayDone = !!(todayPlan && todayPlan.itemsDone >= 12);
+  const displayStreak = isTodayDone ? Math.max(2, currentStreak) : 1;
   const { openMistakes } = useVault();
   const { anthology } = useAnthology();
   const { push } = useNav();
@@ -170,10 +172,10 @@ export function TodayScreen({
           <Chip
             variant="streak"
             onClick={() => onSwitchTab(3)}
-            aria-label={`Current streak: ${currentStreak} days`}
+            aria-label={`Current streak: ${displayStreak} ${displayStreak === 1 ? 'day' : 'days'}`}
           >
             <span className="num" style={{ fontWeight: 700 }}>
-              {currentStreak}
+              {displayStreak}
             </span>
           </Chip>
 

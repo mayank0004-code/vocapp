@@ -6,6 +6,8 @@ import {
   listenToMistakeCounts,
   listenToMistakeVault,
   listenToAnthology,
+  listenToCraftStats,
+  listenToStyleProfile,
   getUserSettings,
   saveUserSettings,
   calcCraftLevel
@@ -17,6 +19,8 @@ export function DataProvider({ currentUser, children }) {
   const [words, setWords] = useState([]);
   const [pendingWords, setPendingWords] = useState([]);
   const [stats, setStats] = useState({ currentStreak: 0, highestStreak: 0, activeDates: [] });
+  const [craft, setCraft] = useState({});
+  const [styleProfile, setStyleProfile] = useState({ habits: [] });
   const [mistakeCounts, setMistakeCounts] = useState({});
   const [vault, setVault] = useState([]);
   const [anthology, setAnthology] = useState([]);
@@ -28,6 +32,7 @@ export function DataProvider({ currentUser, children }) {
     autoAdjustLevel: true
   });
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
 
   // Open listeners ONCE when currentUser is available
   useEffect(() => {
@@ -36,30 +41,45 @@ export function DataProvider({ currentUser, children }) {
       setPendingWords([]);
       setVault([]);
       setAnthology([]);
+      setCraft({});
+      setStyleProfile({ habits: [] });
       setLoading(false);
+      setLoaded(true);
       return;
     }
 
     const uid = currentUser.uid;
-    let loadedCount = 0;
-    const checkLoaded = () => {
-      loadedCount++;
-      if (loadedCount >= 4) setLoading(false);
+    let requiredLoads = { words: false, pending: false, stats: false, craft: false };
+    const markLoaded = (key) => {
+      requiredLoads[key] = true;
+      if (Object.values(requiredLoads).every(Boolean)) {
+        setLoaded(true);
+        setLoading(false);
+      }
     };
 
     const unsubWords = listenToAllWords(uid, (data) => {
       setWords(data || []);
-      checkLoaded();
+      markLoaded('words');
     });
 
     const unsubPending = listenToPendingWords(uid, (data) => {
       setPendingWords(data || []);
-      checkLoaded();
+      markLoaded('pending');
     });
 
     const unsubStats = listenToUserStats(uid, (data) => {
       setStats(data || { currentStreak: 0, highestStreak: 0, activeDates: [] });
-      checkLoaded();
+      markLoaded('stats');
+    });
+
+    const unsubCraft = listenToCraftStats(uid, (data) => {
+      setCraft(data || {});
+      markLoaded('craft');
+    });
+
+    const unsubStyle = listenToStyleProfile(uid, (data) => {
+      setStyleProfile(data || { habits: [] });
     });
 
     const unsubMistakes = listenToMistakeCounts(uid, (data) => {
@@ -68,7 +88,6 @@ export function DataProvider({ currentUser, children }) {
 
     const unsubVault = listenToMistakeVault(uid, (data) => {
       setVault(data || []);
-      checkLoaded();
     });
 
     const unsubAnthology = listenToAnthology(uid, (data) => {
@@ -83,6 +102,8 @@ export function DataProvider({ currentUser, children }) {
       unsubWords && unsubWords();
       unsubPending && unsubPending();
       unsubStats && unsubStats();
+      unsubCraft && unsubCraft();
+      unsubStyle && unsubStyle();
       unsubMistakes && unsubMistakes();
       unsubVault && unsubVault();
       unsubAnthology && unsubAnthology();
@@ -123,15 +144,33 @@ export function DataProvider({ currentUser, children }) {
     const openMistakes = vault.filter(m => !m.isRedeemed && !m.fixed);
     const fixedMistakes = vault.filter(m => m.isRedeemed || m.fixed);
 
-    // Craft stats & rank
-    const craftLevelInfo = calcCraftLevel(stats.xp || stats.totalPracticed || 0, stats.tierCompletions || {});
+    // Craft stats, totals & rank from profile/craft
+    const combinedTiers = {
+      1: (craft.grammar?.tierCompletions?.[1] || 0) + (craft.flow?.tierCompletions?.[1] || 0) + (craft.context?.tierCompletions?.[1] || 0) + (craft.punctuation?.tierCompletions?.[1] || 0),
+      2: (craft.grammar?.tierCompletions?.[2] || 0) + (craft.flow?.tierCompletions?.[2] || 0) + (craft.context?.tierCompletions?.[2] || 0) + (craft.punctuation?.tierCompletions?.[2] || 0),
+      3: (craft.grammar?.tierCompletions?.[3] || 0) + (craft.flow?.tierCompletions?.[3] || 0) + (craft.context?.tierCompletions?.[3] || 0) + (craft.punctuation?.tierCompletions?.[3] || 0),
+      4: (craft.grammar?.tierCompletions?.[4] || 0) + (craft.flow?.tierCompletions?.[4] || 0) + (craft.context?.tierCompletions?.[4] || 0) + (craft.punctuation?.tierCompletions?.[4] || 0),
+    };
+    const totalCraftXp = (craft.grammar?.xp || 0) + (craft.flow?.xp || 0) + (craft.context?.xp || 0) + (craft.punctuation?.xp || 0);
+    const totalCraftSolved = (craft.grammar?.solved || 0) + (craft.flow?.solved || 0) + (craft.context?.solved || 0) + (craft.punctuation?.solved || 0);
+    const craftLevelInfo = calcCraftLevel(totalCraftXp, combinedTiers);
 
-    // Daily 0/12 session plan
+    // Daily 0/12 session plan strictly for today's date
+    const nowDate = new Date();
+    const todayStr = nowDate.getFullYear() + '-' + String(nowDate.getMonth() + 1).padStart(2, '0') + '-' + String(nowDate.getDate()).padStart(2, '0');
+    const isToday = stats.today?.date === todayStr;
+    const reviewsDone = isToday ? (stats.today.reviewsDone || 0) : 0;
+    const drillsDone = isToday ? (stats.today.drillsDone || 0) : 0;
+    const wordWritten = isToday ? !!stats.today.wordWritten : false;
+    const itemsDone = Math.min(12, reviewsDone + drillsDone + (wordWritten ? 3 : 0));
+
     const todayPlan = {
+      date: todayStr,
       reviewsDueCount: dueWords.length,
-      drillsDone: stats.drillsDone || 0,
-      wordsWritten: stats.wordsWritten || 0,
-      itemsDone: Math.min(12, (stats.reviewsDone || 0) + (stats.drillsDone || 0) + (stats.wordsWritten || 0) * 3)
+      reviewsDone,
+      drillsDone,
+      wordWritten,
+      itemsDone
     };
 
     return {
@@ -141,10 +180,13 @@ export function DataProvider({ currentUser, children }) {
       learningWords,
       openMistakes,
       fixedMistakes,
+      craft,
+      totalCraftXp,
+      totalCraftSolved,
       craftLevelInfo,
       todayPlan
     };
-  }, [words, pendingWords, stats, vault]);
+  }, [words, pendingWords, stats, craft, vault]);
 
   const updateSettingsHandler = async (newSettings) => {
     if (!currentUser?.uid) return;
@@ -155,9 +197,12 @@ export function DataProvider({ currentUser, children }) {
   const contextValue = {
     currentUser,
     loading,
+    loaded,
     words,
     pendingWords,
     stats,
+    craft,
+    styleProfile,
     mistakeCounts,
     vault,
     anthology,
@@ -182,18 +227,28 @@ export function useData() {
 }
 
 export function useWords() {
-  const { words, dueWords, savedWords, masteredWords, learningWords, loading } = useData();
-  return { allWords: words, dueWords, savedWords, masteredWords, learningWords, loading };
+  const { words, dueWords, savedWords, masteredWords, learningWords, loading, loaded } = useData();
+  return { allWords: words, dueWords, savedWords, masteredWords, learningWords, loading, loaded };
 }
 
 export function useStats() {
-  const { stats, todayPlan, craftLevelInfo } = useData();
-  return { stats, todayPlan, craftLevelInfo, currentStreak: stats.currentStreak, highestStreak: stats.highestStreak };
+  const { stats, todayPlan, craft, totalCraftXp, totalCraftSolved, craftLevelInfo, loaded } = useData();
+  return {
+    stats,
+    todayPlan,
+    craft,
+    totalCraftXp,
+    totalCraftSolved,
+    craftLevelInfo,
+    currentStreak: stats.currentStreak,
+    highestStreak: stats.highestStreak,
+    loaded
+  };
 }
 
 export function useVault() {
-  const { vault, openMistakes, fixedMistakes } = useData();
-  return { allMistakes: vault, openMistakes, fixedMistakes };
+  const { vault, openMistakes, fixedMistakes, mistakeCounts } = useData();
+  return { allMistakes: vault, openMistakes, fixedMistakes, mistakeCounts };
 }
 
 export function useAnthology() {

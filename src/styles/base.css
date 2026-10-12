@@ -195,7 +195,7 @@ button:disabled {
 @keyframes cardCascade {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.985);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -204,8 +204,8 @@ button:disabled {
 }
 
 .card-cascade {
-  animation: cardCascade 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
-  animation-delay: calc(var(--i, 0) * 35ms);
+  animation: cardCascade 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 25ms);
 }
 
 /* Reduced motion preference */
@@ -588,6 +588,58 @@ button:disabled {
   color: var(--fg3);
   font-size: 13.5px;
 }
+.sbar {
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  gap: 2px;
+  margin: 12px 0 12px;
+  background: var(--card3);
+}
+.sbar span {
+  height: 100%;
+  display: block;
+}
+.leg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+.leg span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--fg2);
+}
+.leg span i {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.flame {
+  transform-origin: 50% 85%;
+  animation: flick 1.8s ease-in-out infinite;
+  display: inline-block;
+  will-change: transform;
+}
+@keyframes flick {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.05, 0.96) rotate(-2.5deg);
+  }
+  50% {
+    transform: scale(0.97, 1.04) rotate(2deg);
+  }
+  75% {
+    transform: scale(1.03, 0.98) rotate(-1deg);
+  }
+}
 .focus .lab {
   color: var(--org2);
   font-size: 13px;
@@ -944,15 +996,15 @@ button:disabled {
 .screen {
   opacity: 0;
   visibility: hidden;
-  transform: translateY(10px) scale(0.992);
-  transition: opacity 0.2s var(--ease), transform 0.34s var(--ease), visibility 0s linear 0.2s;
+  pointer-events: none;
+  transition: opacity 0.18s cubic-bezier(0.2, 0, 0, 1), visibility 0s linear 0.18s;
 }
 
 .screen.on {
   opacity: 1;
   visibility: visible;
-  transform: none;
-  transition: opacity 0.26s var(--ease), transform 0.38s var(--ease), visibility 0s;
+  pointer-events: auto;
+  transition: opacity 0.22s cubic-bezier(0.2, 0, 0, 1), visibility 0s;
 }
 
 .scroller {

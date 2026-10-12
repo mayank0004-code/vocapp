@@ -10,7 +10,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Dual-mode UI switch: 'v1' is default until Phase 7. Set localStorage['vocapp.ui'] = 'v2' or ?ui=v2 to test redesign.
+  // Dual-mode UI switch: 'v2' (redesign) is default. Set localStorage['vocapp.ui'] = 'v1' or ?ui=v1 for classic UI fallback.
   const [uiVersion] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -19,9 +19,9 @@ function App() {
         localStorage.setItem('vocapp.ui', queryUI);
         return queryUI;
       }
-      return localStorage.getItem('vocapp.ui') || 'v1';
+      return localStorage.getItem('vocapp.ui') || 'v2';
     } catch {
-      return 'v1';
+      return 'v2';
     }
   });
 

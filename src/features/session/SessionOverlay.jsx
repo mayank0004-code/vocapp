@@ -15,6 +15,8 @@ export function SessionOverlay({
   onClose = () => {},
   onGoToWords = () => {}
 }) {
+  if (!isOpen) return null;
+
   const { currentUser } = useData();
   const { dueWords, allWords } = useWords();
 

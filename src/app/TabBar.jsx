@@ -202,6 +202,11 @@ export function TabBar({
             role="tab"
             aria-selected={isActive}
             aria-label={tab.label}
+            onClick={(e) => {
+              e.stopPropagation();
+              onTabChange(idx);
+              haptics.tap();
+            }}
             style={{
               position: 'relative',
               display: 'flex',

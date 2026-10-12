@@ -9,6 +9,7 @@ import Capture from './Capture';
 import SavedList from './SavedList';
 import WordDetailPage from '../words/WordDetailPage';
 import SettingsPage from '../settings/SettingsPage';
+import { useLayout } from '../../motion/useLayout';
 
 export function TodayScreen({
   onSwitchTab = () => {},
@@ -21,6 +22,7 @@ export function TodayScreen({
   const { openMistakes } = useVault();
   const { anthology } = useAnthology();
   const { push } = useNav();
+  const { isLaptop, isTablet } = useLayout();
 
   const [isBellOpen, setIsBellOpen] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
@@ -117,7 +119,9 @@ export function TodayScreen({
       {/* Large Header Bar */}
       <header
         style={{
-          padding: '10px 20px 4px',
+          maxWidth: 'var(--content-max)',
+          margin: '0 auto',
+          padding: '10px var(--gutter, 20px) 4px',
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between'
@@ -139,7 +143,7 @@ export function TodayScreen({
           <h1
             style={{
               margin: 0,
-              fontSize: '34px',
+              fontSize: isLaptop ? '40px' : '34px',
               fontWeight: 700,
               letterSpacing: '-0.03em',
               lineHeight: 1.08
@@ -262,51 +266,116 @@ export function TodayScreen({
         onPractice={(word) => onStartSession('practice-word', { word })}
       />
 
-      {/* 1. Instagram Stories Word Rings */}
-      <Stories
-        dueWords={dueWords}
-        savedWords={savedWords}
-        vaultSlips={openMistakes}
-        anthologySentences={anthology}
-        onStoryAction={(actionType, data) => {
-          if (actionType === 'practice-word') {
-            onStartSession('practice-word', { word: data.word });
-          } else if (actionType === 'reviews') {
-            onStartSession('reviews', {});
-          } else if (actionType === 'fix-slip') {
-            onSwitchTab(1); // Go to Practice
-          } else if (actionType === 'anthology') {
-            onSwitchTab(1); // Go to Practice
-          }
-        }}
-      />
+      {/* Main Content Layout: 2 Columns on Tablet & Laptop, 1 Column on Phone */}
+      {isTablet || isLaptop ? (
+        <div
+          style={{
+            maxWidth: 'var(--content-max)',
+            margin: '0 auto',
+            padding: '0 var(--gutter, 20px)',
+            display: 'grid',
+            gridTemplateColumns: isLaptop ? '7fr 5fr' : '1fr 1fr',
+            gap: '24px',
+            alignItems: 'start'
+          }}
+        >
+          {/* Left Column: Session Card & Saved Shelf */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <SessionCard
+              dueWordsCount={dueWords.length}
+              targetWord={targetWord}
+              drillsRemaining={2}
+              itemsDone={todayPlan.itemsDone}
+              streak={currentStreak}
+              highestStreak={highestStreak}
+              activeDates={stats.activeDates || []}
+              onStartSession={() => onStartSession('full', {})}
+              onOnlyReviews={() => onStartSession('reviews', {})}
+              onOnlyDrills={() => onStartSession('drills', {})}
+            />
 
-      {/* 2. Unified Session Card */}
-      <SessionCard
-        dueWordsCount={dueWords.length}
-        targetWord={targetWord}
-        drillsRemaining={2}
-        itemsDone={todayPlan.itemsDone}
-        streak={currentStreak}
-        highestStreak={highestStreak}
-        activeDates={stats.activeDates || []}
-        onStartSession={() => onStartSession('full', {})}
-        onOnlyReviews={() => onStartSession('reviews', {})}
-        onOnlyDrills={() => onStartSession('drills', {})}
-      />
+            <SavedList
+              savedWords={savedWords}
+              onPractice={(item) => onStartSession('practice-word', { word: item.word })}
+              onOpenWord={(item) => handleOpenWord(item)}
+            />
+          </div>
 
-      {/* 3. Word Capture with Spell-Correction */}
-      <Capture
-        onPractice={(wordData) => onStartSession('practice-word', { word: wordData.word })}
-        onOpenInWords={(wordData) => handleOpenWord(wordData)}
-      />
+          {/* Right Column: Word Stories & Quick Capture */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <Stories
+              dueWords={dueWords}
+              savedWords={savedWords}
+              vaultSlips={openMistakes}
+              anthologySentences={anthology}
+              onStoryAction={(actionType, data) => {
+                if (actionType === 'practice-word') {
+                  onStartSession('practice-word', { word: data.word });
+                } else if (actionType === 'reviews') {
+                  onStartSession('reviews', {});
+                } else if (actionType === 'fix-slip') {
+                  onSwitchTab(1);
+                } else if (actionType === 'anthology') {
+                  onSwitchTab(1);
+                }
+              }}
+            />
 
-      {/* 4. Saved for Later Shelf (7-Day Expiry) */}
-      <SavedList
-        savedWords={savedWords}
-        onPractice={(item) => onStartSession('practice-word', { word: item.word })}
-        onOpenWord={(item) => handleOpenWord(item)}
-      />
+            <Capture
+              onPractice={(wordData) => onStartSession('practice-word', { word: wordData.word })}
+              onOpenInWords={(wordData) => handleOpenWord(wordData)}
+            />
+          </div>
+        </div>
+      ) : (
+        <div style={{ maxWidth: 'var(--content-max)', margin: '0 auto' }}>
+          {/* 1. Instagram Stories Word Rings */}
+          <Stories
+            dueWords={dueWords}
+            savedWords={savedWords}
+            vaultSlips={openMistakes}
+            anthologySentences={anthology}
+            onStoryAction={(actionType, data) => {
+              if (actionType === 'practice-word') {
+                onStartSession('practice-word', { word: data.word });
+              } else if (actionType === 'reviews') {
+                onStartSession('reviews', {});
+              } else if (actionType === 'fix-slip') {
+                onSwitchTab(1);
+              } else if (actionType === 'anthology') {
+                onSwitchTab(1);
+              }
+            }}
+          />
+
+          {/* 2. Unified Session Card */}
+          <SessionCard
+            dueWordsCount={dueWords.length}
+            targetWord={targetWord}
+            drillsRemaining={2}
+            itemsDone={todayPlan.itemsDone}
+            streak={currentStreak}
+            highestStreak={highestStreak}
+            activeDates={stats.activeDates || []}
+            onStartSession={() => onStartSession('full', {})}
+            onOnlyReviews={() => onStartSession('reviews', {})}
+            onOnlyDrills={() => onStartSession('drills', {})}
+          />
+
+          {/* 3. Word Capture with Spell-Correction */}
+          <Capture
+            onPractice={(wordData) => onStartSession('practice-word', { word: wordData.word })}
+            onOpenInWords={(wordData) => handleOpenWord(wordData)}
+          />
+
+          {/* 4. Saved for Later Shelf (7-Day Expiry) */}
+          <SavedList
+            savedWords={savedWords}
+            onPractice={(item) => onStartSession('practice-word', { word: item.word })}
+            onOpenWord={(item) => handleOpenWord(item)}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -1,32 +1,26 @@
 import React, { useState, useMemo } from 'react';
 import { useWords, useStats, useVault, useAnthology } from '../../data/DataProvider';
 import { useNav } from '../../app/NavStack';
+import { triggerHaptic } from '../../motion/haptics';
+import Button from '../../ui/Button';
 import { VaultPage } from '../practice/VaultPage';
 import { AnthologyPage } from '../practice/AnthologyPage';
 import { DrillPage } from '../practice/DrillPage';
-import Button from '../../ui/Button';
-import { triggerHaptic } from '../../motion/haptics';
-
-const SPEC = [
-  { name: 'Context', k: 2, count: 15, pct: 65, org: true },
-  { name: 'Flow', k: 1, count: 6, pct: 26, org: false },
-  { name: 'Grammar', k: 0, count: 2, pct: 9, org: false },
-  { name: 'Punctuation', k: 3, count: 0, pct: 0, org: false }
-];
+import { useLayout } from '../../motion/useLayout';
 
 const HABITS = [
   {
-    title: 'Stiff, roundabout phrasing',
-    tip: 'Say who did what: “we decided”, not “a decision was made by us”.',
-    meta: 'Context · seen 15 times · last with “veil”',
-    k: 2,
+    title: 'Repeating the same sentence openers',
+    tip: 'Start with a prepositional phrase or a gerund.',
+    meta: 'Flow · seen 4 times · last with “avail”',
+    k: 1,
     tag: 'Coaching'
   },
   {
-    title: 'Chaining with “and so”',
-    tip: 'One thought per clause. Use a full stop or “because”.',
-    meta: 'Flow · seen 3 times · last with “indifferent”',
-    k: 1,
+    title: 'Using “very” or “extremely”',
+    tip: 'Reach for a stronger verb or adjective instead.',
+    meta: 'Context · seen 3 times · last with “abstruse”',
+    k: 2,
     tag: 'Needs work'
   },
   {
@@ -58,6 +52,7 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
   const { openMistakes = [], fixedMistakes = [], allMistakes = [] } = useVault();
   const { anthology = [] } = useAnthology();
   const { push } = useNav();
+  const { isLaptop, isTablet } = useLayout();
 
   const [scrollTop, setScrollTop] = useState(0);
 
@@ -88,7 +83,7 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
             title: 'Drill',
             component: DrillPage,
             props: {
-              skillId: m.skill || 0,
+              skillId: m.skillId || 0,
               initialTier: 3,
               mistake: m
             },
@@ -128,13 +123,216 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
         state = 'on';
       } else if (dayOfMonth === todayDate) {
         state = currentStreak >= 2 ? 'on' : 'today';
-      } else if (dayOfMonth < todayDate && dayOfMonth > todayDate - currentStreak) {
-        state = 'on';
       }
       cells.push({ index: i, state });
     }
     return cells;
-  }, [currentStreak, stats?.activeDates]);
+  }, [stats?.activeDates, currentStreak]);
+
+  // Sub-components for flexible multi-column rendering
+  const StreakCard = (
+    <section className="pcard streakc" aria-label="Streak" style={{ margin: 0 }}>
+      <div className="r1">
+        <div>
+          <span className="lab">Streak</span>
+          <span className="big num">
+            {currentStreak} {currentStreak === 1 ? 'day' : 'days'}
+          </span>
+          <small>Best: {highestStreak} days · 1 streak freeze ready</small>
+        </div>
+        <span style={{ color: 'var(--warn)', marginTop: '4px' }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+          </svg>
+        </span>
+      </div>
+
+      <div className="calh" aria-hidden="true">
+        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+      </div>
+      <div className="cal go" role="img" aria-label="Activity calendar">
+        {calendarCells.map((c) => (
+          <i
+            key={c.index}
+            className={c.state}
+            style={{ '--i': c.index }}
+          />
+        ))}
+      </div>
+    </section>
+  );
+
+  const MetricTiles = (
+    <div className="tiles" style={{ margin: 0 }}>
+      <button
+        className="tile press"
+        onClick={() => {
+          triggerHaptic('light');
+          onSwitchTab(2);
+        }}
+      >
+        <span>Words</span>
+        <b className="num">{allWords.length || 84}</b>
+        <small>{masteredWords.length || 12} mastered</small>
+      </button>
+
+      <button
+        className="tile press"
+        onClick={() => {
+          triggerHaptic('light');
+          onSwitchTab(1);
+        }}
+      >
+        <span>Drills solved</span>
+        <b className="num">{drillsSolved}</b>
+        <small>across 4 skills</small>
+      </button>
+
+      <button
+        className="tile press"
+        onClick={() => {
+          triggerHaptic('light');
+          onSwitchTab(1);
+        }}
+      >
+        <span>Accuracy</span>
+        <b className="num">82%</b>
+        <small>last 30 days</small>
+      </button>
+
+      <button
+        className="tile press"
+        onClick={handleOpenVault}
+      >
+        <span>Vault slips</span>
+        <b className="num">{openMistakes.length || 3}</b>
+        <small>{fixedMistakes.length || 5} fixed</small>
+      </button>
+    </div>
+  );
+
+  const RankCard = (
+    <section className="pcard rankc" aria-label="Writing level" style={{ margin: 0 }}>
+      <div className="hd">
+        <h2>Writing level · {rank}</h2>
+        <span>L{levelNum}</span>
+      </div>
+      <p className="rsub">{rankText}</p>
+      <div className="xpbar">
+        <i style={{ width: `${Math.min(100, Math.max(10, (xp / 600) * 100))}%` }} />
+      </div>
+
+      <div className="lgrid">
+        {SKILLS_INFO.map((s) => (
+          <div key={s.name} className="c">
+            <span className="nm">{s.name}</span>
+            <span className="lv">L{s.level}</span>
+            <span className="bar">
+              <i style={{ width: `${s.pct}%` }} />
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+
+  const SlipsCard = (
+    <section className="pcard slips" aria-label="Where your slips happen" style={{ margin: 0 }}>
+      <div className="hd">
+        <h2>Where your slips happen</h2>
+        <span>{totalSlips} total</span>
+      </div>
+      <div className="sbar" aria-hidden="true">
+        <span style={{ width: '42%' }} className="g" title="Grammar 42%" />
+        <span style={{ width: '28%' }} className="c" title="Context 28%" />
+        <span style={{ width: '18%' }} className="f" title="Flow 18%" />
+        <span style={{ width: '12%' }} className="p" title="Punctuation 12%" />
+      </div>
+      <div className="leg">
+        <span><i className="g" />Grammar 42%</span>
+        <span><i className="c" />Context 28%</span>
+        <span><i className="f" />Flow 18%</span>
+        <span><i className="p" />Punctuation 12%</span>
+      </div>
+    </section>
+  );
+
+  const FocusCard = (
+    <section className="focusc" aria-label="Focus area" style={{ margin: 0 }}>
+      <span className="lab">Focus area</span>
+      <h2>Context · collocation mismatches</h2>
+      <p>You know what the words mean; the trap is using them where a native ear expects a different verb.</p>
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={() => handlePracticeSkill(2)}
+        style={{
+          alignSelf: 'flex-start',
+          width: 'auto',
+          padding: '0 20px',
+          marginTop: '6px'
+        }}
+      >
+        Practise Context
+      </Button>
+    </section>
+  );
+
+  const HabitsCard = (
+    <section className="pcard habits" aria-label="Habits to work on" style={{ margin: 0 }}>
+      <div className="hd">
+        <h2>Habits to work on</h2>
+        <span>4 tracked</span>
+      </div>
+      <ul>
+        {HABITS.map((h, idx) => (
+          <li key={idx}>
+            <button
+              className="press"
+              onClick={() => handlePracticeSkill(h.k)}
+            >
+              <div className="grow">
+                <b>{h.title}</b>
+                <span className="tp">{h.tip}</span>
+                <span className="mt">{h.meta}</span>
+              </div>
+              <span
+                className="htag"
+                style={{
+                  background: h.tag === 'Coaching' ? 'var(--accbg)' : 'var(--orgbg)',
+                  color: h.tag === 'Coaching' ? 'var(--acc2)' : 'var(--org2)'
+                }}
+              >
+                {h.tag}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+
+  const DuoCard = (
+    <div className="duo" style={{ margin: 0 }}>
+      <button
+        onClick={handleOpenVault}
+        className="press"
+        style={{ border: '1px solid var(--line)' }}
+      >
+        <b>Mistake Vault</b>
+        <span>{openMistakes.length} to fix · {fixedMistakes.length} fixed</span>
+      </button>
+
+      <button
+        onClick={handleOpenAnthology}
+        className="press"
+        style={{ border: '1px solid var(--line)' }}
+      >
+        <b>Anthology</b>
+        <span>{anthology.length} saved sentences</span>
+      </button>
+    </div>
+  );
 
   return (
     <div
@@ -154,16 +352,16 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
           left: 0,
           right: 0,
           height: '48px',
-          zIndex: 30,
+          zIndex: 20,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          pointerEvents: topBarProgress > 0.1 ? 'auto' : 'none',
-          background: `rgba(22, 22, 24, ${topBarProgress * 0.85})`,
-          backdropFilter: topBarProgress > 0.05 ? 'blur(16px)' : 'none',
-          WebkitBackdropFilter: topBarProgress > 0.05 ? 'blur(16px)' : 'none',
-          borderBottom: `${topBarProgress * 0.5}px solid var(--line)`,
-          transition: 'border-bottom 0.2s ease'
+          background: `rgba(11, 11, 13, ${(topBarProgress * 0.85).toFixed(2)})`,
+          backdropFilter: topBarProgress > 0.05 ? 'blur(20px) saturate(180%)' : 'none',
+          WebkitBackdropFilter: topBarProgress > 0.05 ? 'blur(20px) saturate(180%)' : 'none',
+          borderBottom: topBarProgress > 0.05 ? '0.5px solid var(--line)' : '0.5px solid transparent',
+          transition: 'border 0.2s',
+          pointerEvents: 'none'
         }}
       >
         <span
@@ -180,17 +378,13 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
         </span>
       </div>
 
-      <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+      <div style={{ maxWidth: 'var(--content-max)', margin: '0 auto', padding: '0 var(--gutter, 16px)' }}>
         {/* Large Title Header */}
-        <header
-          style={{
-            padding: '16px 20px 8px'
-          }}
-        >
+        <header style={{ padding: '16px 4px 12px' }}>
           <h1
             style={{
               margin: 0,
-              fontSize: '34px',
+              fontSize: isLaptop ? '40px' : '34px',
               fontWeight: 700,
               letterSpacing: '-0.025em',
               lineHeight: 1.1
@@ -200,211 +394,70 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
           </h1>
         </header>
 
-        {/* Streak & Monthly Calendar Card */}
-        <section className="pcard streakc" aria-label="Streak">
-          <div className="r1">
-            <div>
-              <span className="lab">Streak</span>
-              <span className="big num">
-                {currentStreak} {currentStreak === 1 ? 'day' : 'days'}
-              </span>
-              <small>Best: {highestStreak} days · 1 streak freeze ready</small>
-            </div>
-            <span style={{ color: 'var(--warn)', marginTop: '4px' }}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-              </svg>
-            </span>
-          </div>
-
-          <div className="calh" aria-hidden="true">
-            <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
-          </div>
-          <div className="cal go" role="img" aria-label="Activity calendar">
-            {calendarCells.map((c) => (
-              <i
-                key={c.index}
-                className={c.state}
-                style={{ '--i': c.index }}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* Metric Tiles: Words & Drills */}
-        <div className="tiles">
-          <button
-            className="tile press"
-            onClick={() => {
-              triggerHaptic('light');
-              onSwitchTab(2);
+        {/* 3 Columns on Laptop, 2 Columns on Tablet, 1 Column on Phone */}
+        {isLaptop ? (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: '20px',
+              alignItems: 'start'
             }}
           >
-            <span>Words</span>
-            <b className="num">{allWords.length || 84}</b>
-            <small>{masteredWords.length || 12} mastered</small>
-          </button>
+            {/* Col 1: Streak & Writing Level */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {StreakCard}
+              {RankCard}
+            </div>
 
-          <button
-            className="tile press"
-            onClick={() => {
-              triggerHaptic('light');
-              onSwitchTab(1);
+            {/* Col 2: Metrics, Slips Breakdown & Focus Area */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {MetricTiles}
+              {SlipsCard}
+              {FocusCard}
+            </div>
+
+            {/* Col 3: Habits & Duo Launchers */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {HabitsCard}
+              {DuoCard}
+            </div>
+          </div>
+        ) : isTablet ? (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '20px',
+              alignItems: 'start'
             }}
           >
-            <span>Drills solved</span>
-            <b className="num">{drillsSolved}</b>
-            <small>in Practice</small>
-          </button>
-        </div>
-
-        {/* Writing Rank Card */}
-        <section className="pcard rank" aria-label="Writing level">
-          <div className="r1">
-            <span>Writing rank {levelNum} of 5</span>
-            <b>{rank}</b>
-          </div>
-          <span className="bar">
-            <i style={{ width: `${Math.min(100, Math.round((xp / 300) * 100))}%` }} />
-          </span>
-          <small>{rankText}</small>
-
-          <ul className="skl">
-            {SKILLS_INFO.map((s, i) => (
-              <li key={s.name}>
-                <button
-                  className="press"
-                  onClick={() => handlePracticeSkill(i)}
-                >
-                  <div className="grow">
-                    <div className="r">
-                      <b style={{ fontWeight: 500 }}>{s.name}</b>
-                      <span>Level {s.level}</span>
-                    </div>
-                    <span className="bar">
-                      <i style={{ width: `${s.pct}%` }} />
-                    </span>
-                  </div>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
-                    <path d="m9 18 6-6-6-6" />
-                  </svg>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* Where Your Slips Happen Card */}
-        <section className="pcard spec" aria-label="Where your slips happen">
-          <div className="hd">
-            <h2>Where your slips happen</h2>
-            <span>{totalSlips} slips</span>
-          </div>
-          {SPEC.map((p) => (
-            <button
-              key={p.name}
-              className="press"
-              onClick={() => handlePracticeSkill(p.k)}
-            >
-              <div className="r">
-                <span style={{ color: 'var(--fg)' }}>{p.name}</span>
-                <span>{p.count} · {p.pct}%</span>
-              </div>
-              <span className={`bar ${p.org ? 'org' : ''}`} style={{ width: '100%' }}>
-                <i style={{ width: `${p.pct}%` }} />
-              </span>
-            </button>
-          ))}
-        </section>
-
-        {/* Focus Area Card: Context & Register */}
-        <section className="pcard focus" aria-label="Focus area">
-          <span className="lab">Focus area · Context &amp; register</span>
-          <h2>Put each word where it feels at home</h2>
-          <p>
-            Most of your slips come from formal words in casual sentences, or stiff phrasing where plain words would do.
-          </p>
-
-          <div className="two">
-            <div>
-              <b>Say who did it</b>
-              <span>“We decided”, not “a decision was made”.</span>
+            {/* Col 1: Streak, Metrics & Level */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {StreakCard}
+              {MetricTiles}
+              {RankCard}
             </div>
-            <div>
-              <b>Match the room</b>
-              <span>Formal words for formal writing.</span>
+
+            {/* Col 2: Slips, Focus, Habits & Duo Launchers */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {SlipsCard}
+              {FocusCard}
+              {HabitsCard}
+              {DuoCard}
             </div>
           </div>
-
-          <div className="ex">
-            <span>From your practice with “veil”</span>
-            <span className="o">✗ A veil of secrecy was put by the company on the deal.</span>
-            <span className="b">✓ The company drew a veil of secrecy over the deal.</span>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {StreakCard}
+            {MetricTiles}
+            {RankCard}
+            {SlipsCard}
+            {FocusCard}
+            {HabitsCard}
+            {DuoCard}
           </div>
-
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => handlePracticeSkill(2)}
-            style={{ width: 'auto', alignSelf: 'flex-start', padding: '0 18px' }}
-          >
-            Practise Context
-          </Button>
-        </section>
-
-        {/* Habits to Work On Card */}
-        <section className="pcard habits" aria-label="Habits to work on">
-          <div className="hd">
-            <h2>Habits to work on</h2>
-            <span>4 tracked</span>
-          </div>
-          <ul>
-            {HABITS.map((h, idx) => (
-              <li key={idx}>
-                <button
-                  className="press"
-                  onClick={() => handlePracticeSkill(h.k)}
-                >
-                  <div className="grow">
-                    <b>{h.title}</b>
-                    <span className="tp">{h.tip}</span>
-                    <span className="mt">{h.meta}</span>
-                  </div>
-                  <span
-                    className="htag"
-                    style={{
-                      background: h.tag === 'Coaching' ? 'var(--accbg)' : 'var(--orgbg)',
-                      color: h.tag === 'Coaching' ? 'var(--acc2)' : 'var(--org2)'
-                    }}
-                  >
-                    {h.tag}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* Duo Launcher Cards: Mistake Vault & Anthology */}
-        <div className="duo" style={{ marginTop: '12px' }}>
-          <button
-            onClick={handleOpenVault}
-            className="press"
-            style={{ border: '1px solid var(--line)' }}
-          >
-            <b>Mistake Vault</b>
-            <span>{openMistakes.length} to fix · {fixedMistakes.length} fixed</span>
-          </button>
-
-          <button
-            onClick={handleOpenAnthology}
-            className="press"
-            style={{ border: '1px solid var(--line)' }}
-          >
-            <b>Anthology</b>
-            <span>{anthology.length} saved sentences</span>
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useWords } from '../../data/DataProvider';
 import { useNav } from '../../app/NavStack';
 import WordRow from './WordRow';
@@ -6,13 +6,16 @@ import WordDetailPage from './WordDetailPage';
 import SwipeTabs from '../../ui/SwipeTabs';
 import Button from '../../ui/Button';
 import { Empty } from '../../ui/Feedback';
+import { useLayout } from '../../motion/useLayout';
 
 export function WordsScreen() {
   const { allWords, dueWords, savedWords, masteredWords } = useWords();
   const { push } = useNav();
+  const { isLaptop } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [selectedWordState, setSelectedWordState] = useState(null);
 
   const query = searchQuery.trim().toLowerCase();
 
@@ -35,36 +38,72 @@ export function WordsScreen() {
     );
   };
 
-  const handleWordClick = (word) => {
-    push({
-      id: `word-${word.word}`,
-      title: word.word,
-      component: WordDetailPage,
-      props: { word },
-      hideTab: false
-    });
-  };
-
-  const tabSets = [
+  const tabSets = useMemo(() => [
     { id: 'all', label: 'All', count: allWords.length, list: filterList(sortedAllWords), emptyText: 'No words in your dictionary yet.' },
     { id: 'due', label: 'Due', count: dueWords.length, list: filterList(dueWords), emptyText: 'Nothing due right now. The next review is in about 1 hour.' },
     { id: 'saved', label: 'Saved', count: savedWords.length, list: filterList(savedWords), emptyText: 'No saved words. Use “Save for later” after a lookup.' },
     { id: 'mastered', label: 'Mastered', count: masteredWords.length, list: filterList(masteredWords), emptyText: 'No mastered words yet. Words reach Mastered after 14+ day intervals.' }
-  ];
+  ], [allWords, dueWords, savedWords, masteredWords, sortedAllWords, query]);
 
-  return (
-    <div
-      className="scroller"
-      style={{
-        background: 'var(--bg)',
-        color: 'var(--fg)',
-        fontFamily: 'var(--sans)'
-      }}
-    >
+  const currentTabList = tabSets[activeTab]?.list || [];
+
+  // Active word on laptop: selected or first word in current list
+  const activeSelectedWord = useMemo(() => {
+    if (selectedWordState) {
+      const exists = currentTabList.find(w => w.word === selectedWordState.word);
+      if (exists) return exists;
+    }
+    return currentTabList[0] || null;
+  }, [selectedWordState, currentTabList]);
+
+  // Keyboard navigation on laptop: Up and Down arrow keys move through list
+  useEffect(() => {
+    if (!isLaptop) return;
+
+    const handleKeyDown = (e) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl && /^(INPUT|TEXTAREA|SELECT)$/i.test(activeEl.tagName);
+      if (isInput) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const currentIndex = currentTabList.findIndex(w => w.word === activeSelectedWord?.word);
+        if (currentIndex < currentTabList.length - 1) {
+          setSelectedWordState(currentTabList[currentIndex + 1]);
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const currentIndex = currentTabList.findIndex(w => w.word === activeSelectedWord?.word);
+        if (currentIndex > 0) {
+          setSelectedWordState(currentTabList[currentIndex - 1]);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isLaptop, currentTabList, activeSelectedWord]);
+
+  const handleWordClick = (word) => {
+    if (isLaptop) {
+      setSelectedWordState(word);
+    } else {
+      push({
+        id: `word-${word.word}`,
+        title: word.word,
+        component: WordDetailPage,
+        props: { word },
+        hideTab: false
+      });
+    }
+  };
+
+  const renderListPanel = (isPanel = false) => (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Top Header */}
       <header
         style={{
-          padding: 'calc(var(--sb) + 14px) 20px 4px',
+          padding: isPanel ? '24px 20px 4px' : 'calc(var(--sb) + 14px) 20px 4px',
           display: 'flex',
           flexDirection: 'column',
           gap: '2px'
@@ -76,7 +115,7 @@ export function WordsScreen() {
         <h1
           style={{
             margin: 0,
-            fontSize: '34px',
+            fontSize: isLaptop ? '36px' : '34px',
             fontWeight: 700,
             letterSpacing: '-0.03em',
             lineHeight: 1.08
@@ -131,7 +170,7 @@ export function WordsScreen() {
               background: 'none',
               border: 0,
               outline: 0,
-              fontSize: '16px',
+              fontSize: '15px',
               color: 'var(--fg)'
             }}
           />
@@ -144,7 +183,7 @@ export function WordsScreen() {
             }}
             style={{
               color: 'var(--acc2)',
-              fontSize: '16px',
+              fontSize: '15px',
               whiteSpace: 'nowrap',
               cursor: 'pointer'
             }}
@@ -161,7 +200,6 @@ export function WordsScreen() {
             variant="pri"
             size="sm"
             onClick={() => {
-              // Switches to Today or opens review session
               window.dispatchEvent(new CustomEvent('vocapp:open-session', { detail: { mode: 'reviews' } }));
             }}
           >
@@ -171,7 +209,7 @@ export function WordsScreen() {
       )}
 
       {/* 4 Swipeable Segmented Tabs */}
-      <div style={{ marginTop: '12px' }}>
+      <div style={{ marginTop: '12px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <SwipeTabs
           tabs={tabSets.map(t => ({ id: t.id, label: t.label, count: t.count }))}
           activeIndex={activeTab}
@@ -191,13 +229,23 @@ export function WordsScreen() {
                   }}
                   className="wlist"
                 >
-                  {tab.list.map((wordItem) => (
-                    <WordRow
-                      key={wordItem.word || wordItem.id}
-                      word={wordItem}
-                      onClick={() => handleWordClick(wordItem)}
-                    />
-                  ))}
+                  {tab.list.map((wordItem) => {
+                    const isSelected = isLaptop && activeSelectedWord?.word === wordItem.word;
+                    return (
+                      <div
+                        key={wordItem.word || wordItem.id}
+                        style={{
+                          background: isSelected ? 'var(--card2)' : 'transparent',
+                          transition: 'background 0.15s'
+                        }}
+                      >
+                        <WordRow
+                          word={wordItem}
+                          onClick={() => handleWordClick(wordItem)}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <Empty message={query ? 'No words match your search.' : tab.emptyText}>
@@ -221,6 +269,78 @@ export function WordsScreen() {
           ))}
         </SwipeTabs>
       </div>
+    </div>
+  );
+
+  if (isLaptop) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          height: '100%',
+          width: '100%',
+          overflow: 'hidden',
+          background: 'var(--bg)'
+        }}
+      >
+        {/* Left Column (420px): List, Search, Tabs */}
+        <div
+          className="scroller"
+          style={{
+            width: '420px',
+            flexShrink: 0,
+            position: 'relative',
+            borderRight: '1px solid var(--line)',
+            height: '100%',
+            overflowY: 'auto'
+          }}
+        >
+          {renderListPanel(true)}
+        </div>
+
+        {/* Right Column: Inline WordDetailPage */}
+        <div
+          className="scroller"
+          style={{
+            flex: 1,
+            position: 'relative',
+            height: '100%',
+            overflowY: 'auto',
+            background: 'var(--bg)'
+          }}
+        >
+          {activeSelectedWord ? (
+            <WordDetailPage word={activeSelectedWord} isInline={true} />
+          ) : (
+            <div
+              style={{
+                display: 'grid',
+                placeItems: 'center',
+                height: '100%',
+                color: 'var(--mute)',
+                fontSize: '15px'
+              }}
+            >
+              Select a word to view details
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="scroller"
+      style={{
+        background: 'var(--bg)',
+        color: 'var(--fg)',
+        fontFamily: 'var(--sans)',
+        maxWidth: 'var(--content-max)',
+        margin: '0 auto'
+      }}
+    >
+      {renderListPanel(false)}
     </div>
   );
 }

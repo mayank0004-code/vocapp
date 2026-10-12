@@ -6,9 +6,29 @@ export function useEdgeBack({ onPop, enabled = true }) {
   const gestureStateRef = useRef(null);
   const vtRef = useRef(new VelocityTracker());
 
+  // Escape key support on all screens (especially laptop)
+  useEffect(() => {
+    if (!enabled) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        const activeEl = document.activeElement;
+        const isInput = activeEl && /^(INPUT|TEXTAREA|SELECT)$/i.test(activeEl.tagName);
+        if (!isInput && onPop) {
+          onPop();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onPop, enabled]);
+
   useEffect(() => {
     const el = targetRef.current;
     if (!el || !enabled) return;
+
+    // Edge swipe disabled on laptop
+    const isLaptop = typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches;
+    if (isLaptop) return;
 
     const handlePointerDown = (e) => {
       if (e.button > 0) return;

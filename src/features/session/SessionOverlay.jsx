@@ -6,6 +6,7 @@ import Recall from './steps/Recall';
 import Write from './steps/Write';
 import Done from './steps/Done';
 import WordDetailPage from '../words/WordDetailPage';
+import { useLayout } from '../../motion/useLayout';
 
 export function SessionOverlay({
   isOpen = false,
@@ -19,6 +20,7 @@ export function SessionOverlay({
 
   const { currentUser } = useData();
   const { dueWords, allWords } = useWords();
+  const { isLaptop, isTablet } = useLayout();
 
   const [stepIdx, setStepIdx] = useState(0);
   const [results, setResults] = useState([]);
@@ -58,90 +60,89 @@ export function SessionOverlay({
     }
   }, [isOpen, mode]);
 
-  if (!isOpen) return null;
+  // Global Escape key to end session
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
-  const currentStep = steps[stepIdx] || steps[steps.length - 1];
+  const currentStep = steps[stepIdx] || { kind: 'done' };
 
-  // Calculate weighted progress
-  const weights = steps.map(s => s.kind === 'write' ? 3 : s.kind === 'done' ? 0 : 1);
-  const totalWeight = weights.reduce((a, b) => a + b, 0) || 1;
-  const completedWeight = weights.slice(0, stepIdx).reduce((a, b) => a + b, 0);
+  // Calculate session weights
+  const totalWeight = useMemo(() => {
+    return steps.reduce((acc, s) => {
+      if (s.kind === 'recall') return acc + 1;
+      if (s.kind === 'write') return acc + 3;
+      return acc;
+    }, 0);
+  }, [steps]);
 
-  // Recall grade handler
-  const handleRecallGrade = async (isCorrect) => {
-    const wordItem = currentStep.wordData;
-    const wordKey = wordItem?.id || wordItem?.word;
+  const completedWeight = useMemo(() => {
+    return steps.slice(0, stepIdx).reduce((acc, s) => {
+      if (s.kind === 'recall') return acc + 1;
+      if (s.kind === 'write') return acc + 3;
+      return acc;
+    }, 0);
+  }, [steps, stepIdx]);
 
-    // Record result
-    setResults(prev => [...prev, { id: wordKey, word: wordItem?.word, ok: isCorrect }]);
+  const handleRecallGrade = async (isCorrect, wordItem) => {
+    setResults(prev => [...prev, { kind: 'recall', word: wordItem.word, ok: isCorrect }]);
 
-    // Persist SRS to Firestore
-    if (currentUser?.uid && wordKey) {
+    if (currentUser?.uid && wordItem.word) {
       try {
-        await updateWordSRS(currentUser.uid, wordKey, isCorrect, wordItem?.interval || 1);
+        await updateWordSRS(currentUser.uid, wordItem.word, isCorrect);
         await recordDailyActivity(currentUser.uid);
-      } catch (e) {
-        console.error('Failed to update SRS:', e);
+      } catch (err) {
+        console.error('Failed to update SRS progress', err);
       }
     }
 
-    // Advance to next step
-    setStepIdx(i => Math.min(steps.length - 1, i + 1));
+    setStepIdx(prev => prev + 1);
   };
 
-  // Writing step complete handler
-  const handleWriteComplete = async ({ word, sentences, xpGained }) => {
-    if (currentUser?.uid) {
+  const handleWriteComplete = async (payload) => {
+    setResults(prev => [...prev, { kind: 'write', word: targetWord, ok: true, payload }]);
+
+    if (currentUser?.uid && targetWord) {
       try {
         await saveLearnedWord(currentUser.uid, {
-          word,
-          factualSentence: sentences[0] || '',
-          personalSentence: sentences[1] || '',
-          questionSentence: sentences[2] || '',
-          status: 'learning',
+          word: targetWord,
+          factualSentence: payload.sentences[0] || '',
+          personalSentence: payload.sentences[1] || '',
+          questionSentence: payload.sentences[2] || '',
+          contextSentence: payload.contextSentence || '',
           interval: 1,
-          createdAt: Date.now()
+          repetition: 1,
+          easeFactor: 2.5
         });
         await recordDailyActivity(currentUser.uid);
-      } catch (e) {
-        console.error('Failed to save learned word:', e);
+      } catch (err) {
+        console.error('Failed to save learned word', err);
       }
     }
 
-    // Advance to done
-    setStepIdx(i => Math.min(steps.length - 1, i + 1));
+    setStepIdx(prev => prev + 1);
   };
 
   const modeTitle = mode === 'reviews'
     ? 'Reviews only'
     : mode === 'practice-word'
-    ? `Practise ${targetWord}`
+    ? 'Practise word'
     : mode === 'weak'
     ? 'Weak words'
     : 'Today’s session';
 
-  return (
-    <m.div
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 80,
-        background: 'var(--stage)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}
-      role="dialog"
-      aria-label="Session"
-    >
+  const renderSessionContent = () => (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Top Header Chrome */}
       <header
         style={{
-          padding: 'calc(var(--sb, 44px) + 6px) 16px 12px',
+          padding: isLaptop ? '16px 20px 12px' : 'calc(var(--sb, 0px) + 12px) 16px 12px',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
@@ -223,7 +224,7 @@ export function SessionOverlay({
       {/* Mode Sub-header */}
       <div
         style={{
-          padding: '8px 16px',
+          padding: '8px 20px',
           fontSize: '12px',
           fontWeight: 600,
           color: 'var(--acc2)',
@@ -296,8 +297,6 @@ export function SessionOverlay({
                 targetWord={targetWord}
                 onClose={onClose}
                 onReviewWeak={() => {
-                  const weak = results.filter(r => !r.ok).map(r => r.word);
-                  // Relaunch in weak mode
                   setResults([]);
                   setStepIdx(0);
                 }}
@@ -320,6 +319,118 @@ export function SessionOverlay({
           />
         </div>
       )}
+    </div>
+  );
+
+  if (isLaptop) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 80,
+          background: 'rgba(0, 0, 0, 0.72)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '32px',
+          padding: '24px'
+        }}
+        role="dialog"
+        aria-label="Session"
+      >
+        {/* Centered Session Panel 640px wide */}
+        <m.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.96 }}
+          transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
+          style={{
+            width: '640px',
+            height: 'min(760px, 90vh)',
+            background: 'var(--stage)',
+            borderRadius: '24px',
+            border: '1px solid var(--line)',
+            boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
+        >
+          {renderSessionContent()}
+        </m.div>
+
+        {/* Laptop Keyboard Shortcuts Card Beside */}
+        <aside
+          style={{
+            width: '200px',
+            background: 'rgba(22, 22, 24, 0.8)',
+            border: '1px solid var(--line)',
+            borderRadius: '16px',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            color: 'var(--fg2)',
+            fontSize: '13px'
+          }}
+        >
+          <div style={{ fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--mute)' }}>
+            Shortcuts
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Flip card</span>
+            <span style={{ padding: '2px 6px', background: 'var(--card2)', border: '1px solid var(--line)', borderRadius: '4px', fontSize: '11px' }}>Space</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Didn't know</span>
+            <span style={{ padding: '2px 6px', background: 'var(--card2)', border: '1px solid var(--line)', borderRadius: '4px', fontSize: '11px' }}>←</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Knew it</span>
+            <span style={{ padding: '2px 6px', background: 'var(--card2)', border: '1px solid var(--line)', borderRadius: '4px', fontSize: '11px' }}>→</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>End session</span>
+            <span style={{ padding: '2px 6px', background: 'var(--card2)', border: '1px solid var(--line)', borderRadius: '4px', fontSize: '11px' }}>Esc</span>
+          </div>
+        </aside>
+      </div>
+    );
+  }
+
+  return (
+    <m.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 80,
+        background: 'var(--stage)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}
+      role="dialog"
+      aria-label="Session"
+    >
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%',
+          maxWidth: isTablet ? '560px' : '100%',
+          margin: '0 auto'
+        }}
+      >
+        {renderSessionContent()}
+      </div>
     </m.div>
   );
 }

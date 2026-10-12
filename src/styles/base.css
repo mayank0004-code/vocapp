@@ -195,6 +195,11 @@ button:disabled {
   gap: 10px;
   margin: 0 16px;
 }
+@media (min-width: 640px) {
+  .skgrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
 .skc {
   position: relative;
   z-index: 1;

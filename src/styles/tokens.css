@@ -47,6 +47,8 @@
   --topH: calc(var(--sb) + 48px);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --content-max: 100%;
+  --gutter: 16px;
 
   /* Radii */
   --radius-xs: 6px;
@@ -97,3 +99,18 @@
     --badbg: rgba(255, 59, 48, 0.12);
   }
 }
+
+@media (min-width: 640px) {
+  :root {
+    --content-max: 720px;
+    --gutter: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --content-max: 1120px;
+    --gutter: 32px;
+  }
+}
+

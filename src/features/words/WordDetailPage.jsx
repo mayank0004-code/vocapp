@@ -6,10 +6,10 @@ import { showToast } from '../../ui/Toast';
 import { deleteLearnedWord, deletePendingWord, savePendingWord } from '../../services/db';
 import { useData } from '../../data/DataProvider';
 
-export function WordDetailPage({ word, onBack }) {
+export function WordDetailPage({ word, onBack = () => {}, isInline = false }) {
   const { currentUser } = useData();
   const [isDeleting, setIsDeleting] = useState(false);
-  const containerRef = useEdgeBack({ onPop: onBack, enabled: true });
+  const containerRef = useEdgeBack({ onPop: onBack, enabled: !isInline });
 
   const isSaved = word.status === 'pending';
   const headword = word.word || '';
@@ -99,23 +99,29 @@ export function WordDetailPage({ word, onBack }) {
           justifyContent: 'space-between'
         }}
       >
-        <button
-          onClick={onBack}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            color: 'var(--acc2)',
-            fontSize: '16px',
-            fontWeight: 500,
-            cursor: 'pointer'
-          }}
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-          Words
-        </button>
+        {!isInline ? (
+          <button
+            onClick={onBack}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              color: 'var(--acc2)',
+              fontSize: '16px',
+              fontWeight: 500,
+              cursor: 'pointer'
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            Words
+          </button>
+        ) : (
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--mute)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Word Detail
+          </div>
+        )}
         <button
           onClick={handleSpeak}
           style={{

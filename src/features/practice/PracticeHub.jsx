@@ -9,6 +9,7 @@ import { springs } from '../../motion/springs';
 import { DrillPage } from './DrillPage';
 import { VaultPage } from './VaultPage';
 import { AnthologyPage } from './AnthologyPage';
+import { useLayout } from '../../motion/useLayout';
 
 const SKILLS = [
   { name: 'Grammar', level: 2, pct: 55, desc: 'Keep actions and timing in sync.' },
@@ -30,6 +31,7 @@ export function PracticeHub({ onSwitchTab = () => {} }) {
   const { stats, craftLevelInfo } = useStats();
   const { openMistakes = [] } = useVault();
   const { anthology = [] } = useAnthology();
+  const { isLaptop } = useLayout();
 
   const [selectedSkill, setSelectedSkill] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
@@ -179,11 +181,11 @@ export function PracticeHub({ onSwitchTab = () => {} }) {
         </span>
       </div>
 
-      <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+      <div style={{ maxWidth: 'var(--content-max)', margin: '0 auto', padding: '0 var(--gutter, 16px)' }}>
         {/* Large Title Header */}
         <header
           style={{
-            padding: '16px 20px 8px',
+            padding: '16px 4px 8px',
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'space-between'
@@ -205,7 +207,7 @@ export function PracticeHub({ onSwitchTab = () => {} }) {
             <h1
               style={{
                 margin: 0,
-                fontSize: '34px',
+                fontSize: isLaptop ? '40px' : '34px',
                 fontWeight: 700,
                 letterSpacing: '-0.025em',
                 lineHeight: 1.1

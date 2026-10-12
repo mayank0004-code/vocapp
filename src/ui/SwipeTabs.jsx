@@ -107,7 +107,7 @@ export function SwipeTabs({
       <div style={{ overflow: 'hidden' }}>
         <m.div
           ref={trackRef}
-          animate={{ x: `-${currentIndex * 100}%` }}
+          animate={{ x: `-${(currentIndex * 100) / (panes.length || 1)}%` }}
           transition={springs.content}
           style={{
             display: 'flex',

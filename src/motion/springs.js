@@ -29,6 +29,10 @@ export const springs = {
 
   // Spring back after short drag: response 0.40s, damping 0.68
   springBack:{ type: 'spring', stiffness: 247, damping: 21 },
+
+  // Bouncy micro-pop for rings, badges, checks: response 0.30s, damping 0.72
+  pop:       { type: 'spring', stiffness: 360, damping: 22, mass: 0.8 },
+  snappy:    { type: 'spring', stiffness: 320, damping: 28 },
 };
 
 export const pressCss = 'transform 140ms cubic-bezier(0.2, 0.8, 0.2, 1)';

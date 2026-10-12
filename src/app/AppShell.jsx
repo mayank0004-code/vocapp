@@ -208,10 +208,11 @@ function ShellContent({ currentUser, logout }) {
         {/* Tab 0: Today */}
         <div
           className={`screen ${activeTab === 0 ? 'on' : ''}`}
-          inert={activeTab !== 0 ? '' : undefined}
+          inert={activeTab !== 0 ? true : undefined}
           aria-hidden={activeTab !== 0}
         >
           <TodayScreen
+            isActive={activeTab === 0}
             onSwitchTab={setActiveTab}
             onStartSession={handleStartSession}
             onSignOut={logout}
@@ -221,28 +222,36 @@ function ShellContent({ currentUser, logout }) {
         {/* Tab 1: Practice */}
         <div
           className={`screen ${activeTab === 1 ? 'on' : ''}`}
-          inert={activeTab !== 1 ? '' : undefined}
+          inert={activeTab !== 1 ? true : undefined}
           aria-hidden={activeTab !== 1}
         >
-          <PracticeHub onSwitchTab={setActiveTab} />
+          <PracticeHub
+            isActive={activeTab === 1}
+            onSwitchTab={setActiveTab}
+          />
         </div>
 
         {/* Tab 2: Words */}
         <div
           className={`screen ${activeTab === 2 ? 'on' : ''}`}
-          inert={activeTab !== 2 ? '' : undefined}
+          inert={activeTab !== 2 ? true : undefined}
           aria-hidden={activeTab !== 2}
         >
-          <WordsScreen />
+          <WordsScreen
+            isActive={activeTab === 2}
+          />
         </div>
 
         {/* Tab 3: Progress */}
         <div
           className={`screen ${activeTab === 3 ? 'on' : ''}`}
-          inert={activeTab !== 3 ? '' : undefined}
+          inert={activeTab !== 3 ? true : undefined}
           aria-hidden={activeTab !== 3}
         >
-          <ProgressScreen onSwitchTab={setActiveTab} />
+          <ProgressScreen
+            isActive={activeTab === 3}
+            onSwitchTab={setActiveTab}
+          />
         </div>
       </div>
 

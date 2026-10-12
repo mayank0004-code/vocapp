@@ -10,12 +10,15 @@ import SavedList from './SavedList';
 import WordDetailPage from '../words/WordDetailPage';
 import SettingsPage from '../settings/SettingsPage';
 import { useLayout } from '../../motion/useLayout';
+import { useTabActivation } from '../../motion/useTabActivation';
 
 export function TodayScreen({
+  isActive = true,
   onSwitchTab = () => {},
   onStartSession = () => {},
   onSignOut = () => {}
 }) {
+  const { activationKey } = useTabActivation(isActive);
   const { currentUser } = useData();
   const { dueWords, savedWords, allWords } = useWords();
   const { stats, todayPlan, currentStreak, highestStreak } = useStats();
@@ -289,6 +292,7 @@ export function TodayScreen({
               streak={currentStreak}
               highestStreak={highestStreak}
               activeDates={stats.activeDates || []}
+              activationKey={activationKey}
               onStartSession={() => onStartSession('full', {})}
               onOnlyReviews={() => onStartSession('reviews', {})}
               onOnlyDrills={() => onStartSession('drills', {})}
@@ -308,6 +312,7 @@ export function TodayScreen({
               savedWords={savedWords}
               vaultSlips={openMistakes}
               anthologySentences={anthology}
+              activationKey={activationKey}
               onStoryAction={(actionType, data) => {
                 if (actionType === 'practice-word') {
                   onStartSession('practice-word', { word: data.word });
@@ -335,6 +340,7 @@ export function TodayScreen({
             savedWords={savedWords}
             vaultSlips={openMistakes}
             anthologySentences={anthology}
+            activationKey={activationKey}
             onStoryAction={(actionType, data) => {
               if (actionType === 'practice-word') {
                 onStartSession('practice-word', { word: data.word });
@@ -357,6 +363,7 @@ export function TodayScreen({
             streak={currentStreak}
             highestStreak={highestStreak}
             activeDates={stats.activeDates || []}
+            activationKey={activationKey}
             onStartSession={() => onStartSession('full', {})}
             onOnlyReviews={() => onStartSession('reviews', {})}
             onOnlyDrills={() => onStartSession('drills', {})}

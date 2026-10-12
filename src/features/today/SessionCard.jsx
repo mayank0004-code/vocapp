@@ -10,6 +10,7 @@ export function SessionCard({
   streak = 1,
   highestStreak = 30,
   activeDates = [],
+  activationKey = 0,
   onStartSession = () => {},
   onOnlyReviews = () => {},
   onOnlyDrills = () => {}
@@ -22,6 +23,7 @@ export function SessionCard({
 
   return (
     <section
+      key={activationKey}
       style={{
         margin: '12px 16px 0',
         padding: '20px',
@@ -34,7 +36,7 @@ export function SessionCard({
         background: 'var(--card)',
         border: '1px solid var(--line)'
       }}
-      className="card sess"
+      className="card sess card-cascade"
       aria-label="Today's session"
     >
       {/* Background Radial Glow */}
@@ -51,8 +53,11 @@ export function SessionCard({
       />
 
       {/* Top Header with Progress Ring */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', zIndex: 1 }}>
-        <ProgressRing current={itemsDone} total={12} size={64} />
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', zIndex: 1, '--i': 0 }}
+        className="card-cascade"
+      >
+        <ProgressRing current={itemsDone} total={12} size={64} animate={true} activationKey={activationKey} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, letterSpacing: '-0.01em' }}>
             {isSessionDone ? 'Session complete' : "Today's session"}
@@ -83,12 +88,14 @@ export function SessionCard({
         }}
       >
         <li
+          className="card-cascade"
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
             textDecoration: dueWordsCount === 0 || isSessionDone ? 'line-through' : 'none',
-            color: dueWordsCount === 0 || isSessionDone ? 'var(--mute)' : 'var(--fg2)'
+            color: dueWordsCount === 0 || isSessionDone ? 'var(--mute)' : 'var(--fg2)',
+            '--i': 1
           }}
         >
           <i style={{ width: '8px', height: '8px', borderRadius: '4px', background: '#7C88FF', flexShrink: 0 }} />
@@ -98,12 +105,14 @@ export function SessionCard({
         </li>
 
         <li
+          className="card-cascade"
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
             textDecoration: isSessionDone ? 'line-through' : 'none',
-            color: isSessionDone ? 'var(--mute)' : 'var(--fg2)'
+            color: isSessionDone ? 'var(--mute)' : 'var(--fg2)',
+            '--i': 2
           }}
         >
           <i style={{ width: '8px', height: '8px', borderRadius: '4px', background: '#B9C0FF', flexShrink: 0 }} />
@@ -113,12 +122,14 @@ export function SessionCard({
         </li>
 
         <li
+          className="card-cascade"
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
             textDecoration: drillsRemaining <= 0 || isSessionDone ? 'line-through' : 'none',
-            color: drillsRemaining <= 0 || isSessionDone ? 'var(--mute)' : 'var(--fg2)'
+            color: drillsRemaining <= 0 || isSessionDone ? 'var(--mute)' : 'var(--fg2)',
+            '--i': 3
           }}
         >
           <i style={{ width: '8px', height: '8px', borderRadius: '4px', background: '#FFB054', flexShrink: 0 }} />
@@ -128,8 +139,11 @@ export function SessionCard({
         </li>
       </ul>
 
-      {/* Main Action Button */}
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      {/* Main Action Button with Shimmer Highlight */}
+      <div
+        className="card-cascade shimmer-sweep"
+        style={{ position: 'relative', zIndex: 1, borderRadius: '14px', '--i': 4 }}
+      >
         <Button variant="pri" onClick={onStartSession}>
           {isSessionDone ? 'Run it again' : 'Start session'}
         </Button>

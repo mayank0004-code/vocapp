@@ -6,6 +6,7 @@ export function Stories({
   savedWords = [],
   vaultSlips = [],
   anthologySentences = [],
+  activationKey = 0,
   onStoryAction = () => {}
 }) {
   const [seenSet, setSeenSet] = useState(() => {
@@ -127,7 +128,7 @@ export function Stories({
 
           return (
             <button
-              key={story.id}
+              key={`${story.id}-${activationKey}`}
               onClick={() => handleRingClick(idx)}
               style={{
                 flexShrink: 0,
@@ -137,9 +138,10 @@ export function Stories({
                 alignItems: 'center',
                 gap: '6px',
                 scrollSnapAlign: 'start',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                '--i': idx
               }}
-              className="story-b press"
+              className="story-b press card-cascade"
               aria-label={story.label}
             >
               {/* Outer Ring */}

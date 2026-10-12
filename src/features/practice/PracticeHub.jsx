@@ -10,6 +10,7 @@ import { DrillPage } from './DrillPage';
 import { VaultPage } from './VaultPage';
 import { AnthologyPage } from './AnthologyPage';
 import { useLayout } from '../../motion/useLayout';
+import { useTabActivation } from '../../motion/useTabActivation';
 
 const SKILLS = [
   { name: 'Grammar', level: 2, pct: 55, desc: 'Keep actions and timing in sync.' },
@@ -26,7 +27,8 @@ const TIER_SUBS = [
   'Write an original sentence with one of your words'
 ];
 
-export function PracticeHub({ onSwitchTab = () => {} }) {
+export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
+  const { activationKey } = useTabActivation(isActive);
   const { push } = useNav();
   const { stats, craftLevelInfo } = useStats();
   const { openMistakes = [] } = useVault();
@@ -36,6 +38,16 @@ export function PracticeHub({ onSwitchTab = () => {} }) {
   const [selectedSkill, setSelectedSkill] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
   const [wigglingTier, setWigglingTier] = useState(null);
+  const [barsFilled, setBarsFilled] = useState(false);
+
+  // Trigger skill progress bar fill and stagger on tab activation
+  React.useEffect(() => {
+    setBarsFilled(false);
+    const timer = setTimeout(() => {
+      setBarsFilled(true);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [activationKey, selectedSkill]);
 
   // Frosted topbar interpolation: clamp((scrollTop - 20) / 34, 0, 1)
   const topBarProgress = Math.min(1, Math.max(0, (scrollTop - 20) / 34));
@@ -240,7 +252,7 @@ export function PracticeHub({ onSwitchTab = () => {} }) {
 
         {/* Daily Tune-Up Banner */}
         <section
-          className="tune"
+          className="tune shimmer-sweep"
           aria-label="Daily tune-up"
           style={{ marginTop: '12px' }}
         >
@@ -275,7 +287,7 @@ export function PracticeHub({ onSwitchTab = () => {} }) {
         </h2>
 
         {/* 4-Skill Grid with Glide Highlight */}
-        <div className="skgrid" role="tablist" aria-label="Skill">
+        <div key={`skills-${activationKey}`} className="skgrid" role="tablist" aria-label="Skill">
           {SKILLS.map((s, i) => {
             const isSelected = selectedSkill === i;
             return (
@@ -284,12 +296,13 @@ export function PracticeHub({ onSwitchTab = () => {} }) {
                 role="tab"
                 aria-selected={isSelected}
                 onClick={() => handleSelectSkill(i)}
-                className="skc press"
+                className="skc press card-cascade"
                 style={{
                   position: 'relative',
                   border: isSelected ? '1px solid var(--acc)' : '1px solid var(--card2)',
                   boxShadow: isSelected ? '0 0 0 3px rgba(124,136,255,0.12)' : 'none',
-                  transition: 'border 0.25s, box-shadow 0.25s'
+                  transition: 'border 0.25s, box-shadow 0.25s',
+                  '--i': i
                 }}
               >
                 {isSelected && (
@@ -306,7 +319,12 @@ export function PracticeHub({ onSwitchTab = () => {} }) {
                 </div>
                 <span className="ds">{s.desc}</span>
                 <span className="bar">
-                  <i style={{ width: `${s.pct}%` }} />
+                  <i
+                    style={{
+                      width: barsFilled ? `${s.pct}%` : '0%',
+                      transition: 'width 0.85s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                  />
                 </span>
               </button>
             );
@@ -326,7 +344,7 @@ export function PracticeHub({ onSwitchTab = () => {} }) {
         </h2>
 
         {/* 4 Drill Tiers List */}
-        <ul className="tiers">
+        <ul key={`tiers-${activationKey}-${selectedSkill}`} className="tiers">
           {TIER_NAMES.map((name, idx) => {
             const isUnlocked = unlocked[idx];
             const isWiggling = wigglingTier === idx;
@@ -334,11 +352,12 @@ export function PracticeHub({ onSwitchTab = () => {} }) {
             return (
               <li
                 key={name}
-                className={`${isUnlocked ? '' : 'lk'} ${isWiggling ? 'shake' : ''}`}
+                className={`${isUnlocked ? '' : 'lk'} ${isWiggling ? 'shake' : ''} card-cascade`}
                 onClick={!isUnlocked ? () => handleLockedClick(idx) : undefined}
                 style={{
                   cursor: isUnlocked ? 'default' : 'pointer',
-                  userSelect: 'none'
+                  userSelect: 'none',
+                  '--i': idx
                 }}
               >
                 <span className="n">{idx + 1}</span>

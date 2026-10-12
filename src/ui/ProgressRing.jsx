@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 export function ProgressRing({
   current = 0,
@@ -8,16 +8,38 @@ export function ProgressRing({
   color = 'var(--acc)',
   trackColor = '#2A2A2E',
   showLabel = true,
+  animate = true,
+  activationKey = 0,
   style = {}
 }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const progress = total > 0 ? Math.min(1, Math.max(0, current / total)) : 0;
-  // Always show a tiny pip when progress is 0 but starting
-  const offset = circumference * (1 - (progress > 0 ? progress : 0.025));
+  
+  // Target offset for completed proportion
+  const targetOffset = circumference * (1 - (progress > 0 ? progress : 0.025));
+
+  // State to animate stroke from 0% on initial mount / tab activation
+  const [strokeOffset, setStrokeOffset] = useState(animate ? circumference : targetOffset);
+
+  useEffect(() => {
+    if (!animate) {
+      setStrokeOffset(targetOffset);
+      return;
+    }
+
+    // Momentarily start from 0 progress (full circumference) then draw
+    setStrokeOffset(circumference);
+    const timer = setTimeout(() => {
+      setStrokeOffset(targetOffset);
+    }, 40);
+
+    return () => clearTimeout(timer);
+  }, [current, total, animate, activationKey, targetOffset, circumference]);
 
   return (
     <div
+      key={activationKey}
       style={{
         position: 'relative',
         width: size,
@@ -25,7 +47,7 @@ export function ProgressRing({
         flexShrink: 0,
         ...style
       }}
-      className="xring"
+      className={`xring ${animate ? 'ring-pop' : ''}`}
       aria-valuenow={current}
       aria-valuemax={total}
       role="progressbar"
@@ -53,8 +75,10 @@ export function ProgressRing({
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.2, 0.8, 0.2, 1)' }}
+          strokeDashoffset={strokeOffset}
+          style={{
+            transition: 'stroke-dashoffset 0.85s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
         />
       </svg>
       {showLabel && (

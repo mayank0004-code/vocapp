@@ -11,6 +11,7 @@ const STRENGTH_LABELS = [
 export function StrengthBars({
   strength = 0, // 0 to 4
   big = false,
+  animate = true,
   style = {}
 }) {
   const s = Math.min(4, Math.max(0, strength));
@@ -37,13 +38,15 @@ export function StrengthBars({
         return (
           <i
             key={barIndex}
+            className={animate && isFilled ? 'bar-rise' : ''}
             style={{
               width: `${width}px`,
               height: `${height}px`,
               borderRadius: big ? '3px' : '2px',
               background: isFilled ? 'var(--acc)' : '#2E2E33',
               display: 'block',
-              transition: 'background 0.25s ease'
+              transition: 'background 0.25s ease',
+              '--bar-i': barIndex
             }}
           />
         );

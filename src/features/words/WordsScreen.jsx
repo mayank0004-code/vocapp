@@ -7,8 +7,10 @@ import SwipeTabs from '../../ui/SwipeTabs';
 import Button from '../../ui/Button';
 import { Empty } from '../../ui/Feedback';
 import { useLayout } from '../../motion/useLayout';
+import { useTabActivation } from '../../motion/useTabActivation';
 
-export function WordsScreen() {
+export function WordsScreen({ isActive = true }) {
+  const { activationKey } = useTabActivation(isActive);
   const { allWords, dueWords, savedWords, masteredWords } = useWords();
   const { push } = useNav();
   const { isLaptop } = useLayout();
@@ -193,9 +195,9 @@ export function WordsScreen() {
         )}
       </div>
 
-      {/* Due Banner Shortcut */}
+      {/* Due Banner Shortcut with Shimmer Highlight */}
       {dueWords.length > 0 && (
-        <div style={{ margin: '12px 16px 0' }}>
+        <div style={{ margin: '12px 16px 0', borderRadius: '12px', overflow: 'hidden' }} className="shimmer-sweep">
           <Button
             variant="pri"
             size="sm"
@@ -219,6 +221,7 @@ export function WordsScreen() {
             <div key={tab.id} style={{ padding: '14px 16px 8px' }}>
               {tab.list.length > 0 ? (
                 <div
+                  key={`list-${tab.id}-${activationKey}`}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -229,11 +232,11 @@ export function WordsScreen() {
                   }}
                   className="wlist"
                 >
-                  {tab.list.map((wordItem) => {
+                  {tab.list.map((wordItem, idx) => {
                     const isSelected = isLaptop && activeSelectedWord?.word === wordItem.word;
                     return (
                       <div
-                        key={wordItem.word || wordItem.id}
+                        key={`${wordItem.word || wordItem.id}-${activationKey}-${tab.id}`}
                         style={{
                           background: isSelected ? 'var(--card2)' : 'transparent',
                           transition: 'background 0.15s'
@@ -241,6 +244,7 @@ export function WordsScreen() {
                       >
                         <WordRow
                           word={wordItem}
+                          index={idx}
                           onClick={() => handleWordClick(wordItem)}
                         />
                       </div>

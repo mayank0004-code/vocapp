@@ -4,6 +4,7 @@ import StrengthBars from '../../ui/StrengthBars';
 
 export function WordRow({
   word, // { word, short, definition, due, isDue, hot, crafted, interval, status }
+  index = 0,
   onClick,
   style = {}
 }) {
@@ -24,7 +25,7 @@ export function WordRow({
 
   return (
     <m.div
-      whileTap={{ backgroundColor: 'rgba(255, 255, 255, 0.04)' }}
+      whileTap={{ scale: 0.985, backgroundColor: 'rgba(255, 255, 255, 0.04)' }}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -38,9 +39,10 @@ export function WordRow({
         userSelect: 'none',
         WebkitUserSelect: 'none',
         transition: 'background 0.2s ease',
+        '--i': Math.min(index, 12),
         ...style
       }}
-      className="wrow"
+      className="wrow card-cascade"
     >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
@@ -86,7 +88,7 @@ export function WordRow({
       </div>
 
       {!isSaved && (
-        <StrengthBars strength={strength} />
+        <StrengthBars strength={strength} animate={true} />
       )}
     </m.div>
   );

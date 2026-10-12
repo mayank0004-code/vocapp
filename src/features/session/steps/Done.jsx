@@ -145,7 +145,7 @@ export function Done({
         }}
         className="dn-top"
       >
-        <svg width="72" height="72" viewBox="0 0 132 132" role="img" aria-label="Complete">
+        <svg className="ring-pop" width="72" height="72" viewBox="0 0 132 132" role="img" aria-label="Complete">
           <circle
             cx="66"
             cy="66"

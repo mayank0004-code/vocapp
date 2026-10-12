@@ -7,6 +7,8 @@ import { VaultPage } from '../practice/VaultPage';
 import { AnthologyPage } from '../practice/AnthologyPage';
 import { DrillPage } from '../practice/DrillPage';
 import { useLayout } from '../../motion/useLayout';
+import { useTabActivation } from '../../motion/useTabActivation';
+import { useCountUp } from '../../motion/useCountUp';
 
 const HABITS = [
   {
@@ -46,7 +48,8 @@ const SKILLS_INFO = [
   { name: 'Punctuation', level: 1, pct: 15 }
 ];
 
-export function ProgressScreen({ onSwitchTab = () => {} }) {
+export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
+  const { activationKey } = useTabActivation(isActive);
   const { allWords = [], masteredWords = [] } = useWords();
   const { stats, currentStreak = 1, highestStreak = 30, craftLevelInfo } = useStats();
   const { openMistakes = [], fixedMistakes = [], allMistakes = [] } = useVault();
@@ -55,6 +58,25 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
   const { isLaptop, isTablet } = useLayout();
 
   const [scrollTop, setScrollTop] = useState(0);
+  const [xpBarFilled, setXpBarFilled] = useState(false);
+
+  // Animated counters on tab activation
+  const animatedWordsCount = useCountUp(allWords.length || 84, { enabled: isActive, duration: 700 });
+  const animatedMasteredCount = useCountUp(masteredWords.length || 12, { enabled: isActive, duration: 700 });
+  const animatedDrillsSolved = useCountUp(stats?.drillsDone || stats?.drills || 12, { enabled: isActive, duration: 700 });
+  const animatedAccuracy = useCountUp(82, { enabled: isActive, duration: 750 });
+  const animatedVaultSlips = useCountUp(openMistakes.length || 3, { enabled: isActive, duration: 700 });
+  const animatedFixedSlips = useCountUp(fixedMistakes.length || 5, { enabled: isActive, duration: 700 });
+  const animatedStreak = useCountUp(currentStreak, { enabled: isActive, duration: 600, startValue: 0 });
+
+  // XP bar animation trigger
+  React.useEffect(() => {
+    setXpBarFilled(false);
+    const timer = setTimeout(() => {
+      setXpBarFilled(true);
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [activationKey]);
 
   // Frosted topbar interpolation
   const topBarProgress = Math.min(1, Math.max(0, (scrollTop - 20) / 34));
@@ -131,16 +153,16 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
 
   // Sub-components for flexible multi-column rendering
   const StreakCard = (
-    <section className="pcard streakc" aria-label="Streak" style={{ margin: 0 }}>
+    <section key={`streak-${activationKey}`} className="pcard streakc card-cascade" aria-label="Streak" style={{ margin: 0, '--i': 0 }}>
       <div className="r1">
         <div>
           <span className="lab">Streak</span>
           <span className="big num">
-            {currentStreak} {currentStreak === 1 ? 'day' : 'days'}
+            {animatedStreak} {animatedStreak === 1 ? 'day' : 'days'}
           </span>
           <small>Best: {highestStreak} days · 1 streak freeze ready</small>
         </div>
-        <span style={{ color: 'var(--warn)', marginTop: '4px' }}>
+        <span style={{ color: 'var(--warn)', marginTop: '4px' }} className="ring-pop">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
           </svg>
@@ -150,7 +172,7 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
       <div className="calh" aria-hidden="true">
         <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
       </div>
-      <div className="cal go" role="img" aria-label="Activity calendar">
+      <div key={`cal-${activationKey}`} className="cal go" role="img" aria-label="Activity calendar">
         {calendarCells.map((c) => (
           <i
             key={c.index}
@@ -163,63 +185,72 @@ export function ProgressScreen({ onSwitchTab = () => {} }) {
   );
 
   const MetricTiles = (
-    <div className="tiles" style={{ margin: 0 }}>
+    <div key={`tiles-${activationKey}`} className="tiles" style={{ margin: 0 }}>
       <button
-        className="tile press"
+        className="tile press card-cascade"
+        style={{ '--i': 0 }}
         onClick={() => {
           triggerHaptic('light');
           onSwitchTab(2);
         }}
       >
         <span>Words</span>
-        <b className="num">{allWords.length || 84}</b>
-        <small>{masteredWords.length || 12} mastered</small>
+        <b className="num">{animatedWordsCount}</b>
+        <small>{animatedMasteredCount} mastered</small>
       </button>
 
       <button
-        className="tile press"
+        className="tile press card-cascade"
+        style={{ '--i': 1 }}
         onClick={() => {
           triggerHaptic('light');
           onSwitchTab(1);
         }}
       >
         <span>Drills solved</span>
-        <b className="num">{drillsSolved}</b>
+        <b className="num">{animatedDrillsSolved}</b>
         <small>across 4 skills</small>
       </button>
 
       <button
-        className="tile press"
+        className="tile press card-cascade"
+        style={{ '--i': 2 }}
         onClick={() => {
           triggerHaptic('light');
           onSwitchTab(1);
         }}
       >
         <span>Accuracy</span>
-        <b className="num">82%</b>
+        <b className="num">{animatedAccuracy}%</b>
         <small>last 30 days</small>
       </button>
 
       <button
-        className="tile press"
+        className="tile press card-cascade"
+        style={{ '--i': 3 }}
         onClick={handleOpenVault}
       >
         <span>Vault slips</span>
-        <b className="num">{openMistakes.length || 3}</b>
-        <small>{fixedMistakes.length || 5} fixed</small>
+        <b className="num">{animatedVaultSlips}</b>
+        <small>{animatedFixedSlips} fixed</small>
       </button>
     </div>
   );
 
   const RankCard = (
-    <section className="pcard rankc" aria-label="Writing level" style={{ margin: 0 }}>
+    <section key={`rank-${activationKey}`} className="pcard rankc card-cascade" aria-label="Writing level" style={{ margin: 0, '--i': 1 }}>
       <div className="hd">
         <h2>Writing level · {rank}</h2>
         <span>L{levelNum}</span>
       </div>
       <p className="rsub">{rankText}</p>
       <div className="xpbar">
-        <i style={{ width: `${Math.min(100, Math.max(10, (xp / 600) * 100))}%` }} />
+        <i
+          style={{
+            width: xpBarFilled ? `${Math.min(100, Math.max(10, (xp / 600) * 100))}%` : '0%',
+            transition: 'width 0.85s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+        />
       </div>
 
       <div className="lgrid">

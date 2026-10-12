@@ -8,7 +8,7 @@ import SessionCard from './SessionCard';
 import Capture from './Capture';
 import SavedList from './SavedList';
 import WordDetailPage from '../words/WordDetailPage';
-import Settings from '../../pages/Settings';
+import SettingsPage from '../settings/SettingsPage';
 
 export function TodayScreen({
   onSwitchTab = () => {},
@@ -51,11 +51,7 @@ export function TodayScreen({
     push({
       id: 'settings-screen',
       title: 'Settings',
-      component: ({ onBack }) => (
-        <div style={{ position: 'relative', width: '100%', height: '100vh', overflowY: 'auto', background: 'var(--bg)' }}>
-          <Settings currentUser={currentUser} onClose={onBack} />
-        </div>
-      ),
+      component: SettingsPage,
       hideTab: true
     });
   };

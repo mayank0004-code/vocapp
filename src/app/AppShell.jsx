@@ -6,6 +6,7 @@ import TabBar from './TabBar';
 import TodayScreen from '../features/today/TodayScreen';
 import WordsScreen from '../features/words/WordsScreen';
 import PracticeHub from '../features/practice/PracticeHub';
+import ProgressScreen from '../features/progress/ProgressScreen';
 import Kit from '../pages/Kit';
 import { ToastContainer, showToast } from '../ui/Toast';
 import SessionOverlay from '../features/session/SessionOverlay';
@@ -71,7 +72,7 @@ function ShellContent({ currentUser, logout }) {
         }}
       >
         <span style={{ color: 'var(--acc2)', fontWeight: 600 }}>
-          Vocapp v2 · Today &amp; Words Active
+          Vocapp v2 · All 4 Tabs Active
         </span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
@@ -136,9 +137,7 @@ function ShellContent({ currentUser, logout }) {
         )}
 
         {activeTab === 3 && (
-          <div style={{ padding: '20px 0' }}>
-            <Kit />
-          </div>
+          <ProgressScreen onSwitchTab={setActiveTab} />
         )}
       </main>
 

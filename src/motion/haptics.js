@@ -24,4 +24,13 @@ export const haptics = {
   remove: () => haptic(12),
 };
 
+export const triggerHaptic = (type = 'tap') => {
+  if (typeof type === 'number' || Array.isArray(type)) return haptic(type);
+  if (type === 'light') return haptics.tap();
+  if (type === 'medium') return haptics.commit();
+  if (type === 'success') return haptics.success();
+  if (type === 'error') return haptics.error();
+  return haptics.tap();
+};
+
 export default haptics;

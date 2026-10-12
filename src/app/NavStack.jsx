@@ -46,7 +46,7 @@ export function NavStackProvider({ children }) {
 
   return (
     <NavStackContext.Provider value={{ push, pop, popToRoot, stack, topPage, isTabBarHidden }}>
-      <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: '100%', height: '100vh', overflow: 'hidden' }}>
         {/* Root content */}
         <div
           style={{

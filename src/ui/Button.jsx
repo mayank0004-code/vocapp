@@ -13,10 +13,12 @@ export function Button({
 }) {
   const getVariantStyles = () => {
     switch (variant) {
+      case 'primary':
       case 'pri':
         return { background: 'var(--pri)', color: '#FFFFFF' };
       case 'light':
         return { background: 'var(--fg)', color: '#0B0B0D' };
+      case 'secondary':
       case 'grey':
         return { background: 'var(--card3)', color: 'var(--fg)' };
       case 'off':

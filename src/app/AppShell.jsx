@@ -1,16 +1,23 @@
 import React, { useState } from 'react';
+import { LazyMotion, domMax } from 'framer-motion';
 import { DataProvider } from '../data/DataProvider';
 import NavStackProvider, { useNav } from './NavStack';
 import TabBar from './TabBar';
+import TodayScreen from '../features/today/TodayScreen';
 import WordsScreen from '../features/words/WordsScreen';
 import Kit from '../pages/Kit';
-import { ToastContainer } from '../ui/Toast';
+import { ToastContainer, showToast } from '../ui/Toast';
 import '../styles/tokens.css';
 import '../styles/base.css';
 
 function ShellContent({ currentUser, logout }) {
-  const [activeTab, setActiveTab] = useState(2); // default to Words in Phase 2
+  const [activeTab, setActiveTab] = useState(0); // Default to Today
   const { isTabBarHidden } = useNav();
+
+  const handleStartSession = (mode = 'full', payload = {}) => {
+    const modeName = mode === 'reviews' ? 'Reviews' : mode === 'drills' ? 'Drills' : mode === 'practice-word' ? `Practice: ${payload.word}` : 'Full Session';
+    showToast(`Session starting (${modeName}) · Stage runner lands in Phase 4`);
+  };
 
   return (
     <div
@@ -45,7 +52,7 @@ function ShellContent({ currentUser, logout }) {
         }}
       >
         <span style={{ color: 'var(--acc2)', fontWeight: 600 }}>
-          Vocapp v2 · Phase 2 (Shell &amp; Words)
+          Vocapp v2 · Today &amp; Words Active
         </span>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
@@ -95,10 +102,10 @@ function ShellContent({ currentUser, logout }) {
         }}
       >
         {activeTab === 0 && (
-          <div style={{ padding: '80px 20px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '24px' }}>Today</h2>
-            <p style={{ color: 'var(--mute)' }}>Today screen with Stories &amp; Unified Session lands in Phase 3.</p>
-          </div>
+          <TodayScreen
+            onSwitchTab={setActiveTab}
+            onStartSession={handleStartSession}
+          />
         )}
 
         {activeTab === 1 && (
@@ -131,10 +138,13 @@ function ShellContent({ currentUser, logout }) {
 
 export default function AppShell({ currentUser, logout }) {
   return (
-    <DataProvider currentUser={currentUser}>
-      <NavStackProvider>
-        <ShellContent currentUser={currentUser} logout={logout} />
-      </NavStackProvider>
-    </DataProvider>
+    <LazyMotion features={domMax}>
+      <DataProvider currentUser={currentUser}>
+        <NavStackProvider>
+          <ShellContent currentUser={currentUser} logout={logout} />
+        </NavStackProvider>
+      </DataProvider>
+    </LazyMotion>
   );
 }
+

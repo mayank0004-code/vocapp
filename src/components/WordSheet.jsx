@@ -5,9 +5,10 @@
  * Opens immediately with a skeleton inside. Enter/exit symmetrically
  * from/to the trigger element. Drag with momentum projection to dismiss.
  */
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
 import { springs, project } from '../motion/springs';
+import ErrorBoundary from './ErrorBoundary';
 
 /* ── Icons ─────────────────────────────────────────────────── */
 const Icon = ({ path, size = 20, color = 'currentColor', fill = 'none' }) => (
@@ -25,6 +26,7 @@ const ICONS = {
   audio:    ['M11 5 6 9H2v6h4l5 4V5z', 'M19.07 4.93a10 10 0 0 1 0 14.14', 'M15.54 8.46a5 5 0 0 1 0 7.07'],
   bookmark: ['M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z'],
   x:        ['M18 6 6 18', 'M6 6l12 12'],
+  trash:    ['M3 6h18', 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'],
 };
 
 /* ── Skeleton ─────────────────────────────────────────────── */
@@ -35,10 +37,41 @@ function Skel({ w = '100%', h = 16, style = {} }) {
 }
 
 function SheetSkeleton({ word }) {
+  const [phase, setPhase] = useState(0);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 2800);
+    const t2 = setTimeout(() => setPhase(2), 6500);
+    const t3 = setTimeout(() => setPhase(3), 13000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, []);
+
+  const getStatusText = () => {
+    switch (phase) {
+      case 1:
+        return `Consulting AI language mentor for "${word}"…`;
+      case 2:
+        return `Synthesizing etymology, collocations & register…`;
+      case 3:
+        return `Taking a moment longer than usual to analyze…`;
+      default:
+        return `Looking up "${word}"…`;
+    }
+  };
+
   return (
     <div style={{ padding: 'var(--sp-6)' }}>
-      <p style={{ fontSize: 'var(--type-sm)', color: 'var(--text-tertiary)', marginBottom: 'var(--sp-4)' }}>
-        Looking up "{word}"…
+      <p style={{
+        fontSize: 'var(--type-sm)',
+        color: phase >= 2 ? 'var(--color-warning)' : 'var(--text-tertiary)',
+        marginBottom: 'var(--sp-4)',
+        transition: 'color 0.3s ease'
+      }}>
+        {getStatusText()}
       </p>
       {/* Word */}
       <Skel w="55%" h={34} style={{ marginBottom: 'var(--sp-2)' }} />
@@ -65,6 +98,7 @@ export default function WordSheet({
   word,          // the word being looked up (for skeleton label)
   onPractice,
   onSaveForLater,
+  onRemove,      // callback to delete a pending word
   triggerRef,    // ref to the element that opened the sheet (for enter/exit origin)
 }) {
   const sheetRef    = useRef(null);
@@ -134,7 +168,7 @@ export default function WordSheet({
             style={{
               position: 'fixed', inset: 0,
               background: 'rgba(0,0,0,0.4)',
-              zIndex: 200,
+              zIndex: 399,
               backdropFilter: 'blur(2px)',
               WebkitBackdropFilter: 'blur(2px)',
             }}
@@ -168,7 +202,7 @@ export default function WordSheet({
             style={{
               position: 'fixed',
               bottom: 0, left: 0, right: 0,
-              zIndex: 201,
+              zIndex: 400,
               background: 'var(--surface-color)',
               borderRadius: 'var(--radius-lg) var(--radius-lg) 0 0',
               maxHeight: '90dvh',
@@ -221,10 +255,13 @@ export default function WordSheet({
                 {wordData && !loading ? `Word loaded: ${wordData.word}` : ''}
               </div>
 
-              {loading || !wordData
-                ? <SheetSkeleton word={word} />
-                : <WordContent wordData={wordData} playAudio={playAudio} />
-              }
+              <ErrorBoundary fallback={<div style={{ padding: 'var(--sp-5)', color: 'var(--text-secondary)' }}>Could not render word details.</div>}>
+                {loading || !wordData ? (
+                  <SheetSkeleton word={word} />
+                ) : (
+                  <WordContent wordData={wordData} playAudio={playAudio} />
+                )}
+              </ErrorBoundary>
             </div>
 
             {/* Sticky action footer */}
@@ -243,14 +280,26 @@ export default function WordSheet({
                 >
                   Practice now
                 </button>
-                <button
-                  className="btn btn-secondary"
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--sp-2)' }}
-                  onClick={onSaveForLater}
-                >
-                  <Icon path={ICONS.bookmark} size={16} />
-                  Save for later
-                </button>
+                {onSaveForLater && (
+                  <button
+                    className="btn btn-secondary"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--sp-2)' }}
+                    onClick={onSaveForLater}
+                  >
+                    <Icon path={ICONS.bookmark} size={16} />
+                    Save for later
+                  </button>
+                )}
+                {onRemove && (
+                  <button
+                    className="btn btn-secondary"
+                    style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--sp-2)', color: 'var(--color-error)' }}
+                    onClick={onRemove}
+                  >
+                    <Icon path={ICONS.trash} size={16} />
+                    Remove
+                  </button>
+                )}
               </div>
             )}
           </m.div>
@@ -261,7 +310,37 @@ export default function WordSheet({
 }
 
 /* ── Word Content ────────────────────────────────────────────── */
+function safeStr(val) {
+  if (!val) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number') return String(val);
+  if (typeof val === 'object') {
+    return val.text || val.meaning || val.definition || val.example || Object.values(val).filter(v => typeof v === 'string').join(' ') || '';
+  }
+  return String(val);
+}
+
 function WordContent({ wordData, playAudio }) {
+  const collocations = Array.isArray(wordData.collocations)
+    ? wordData.collocations
+    : (typeof wordData.collocations === 'string' && wordData.collocations.trim())
+      ? wordData.collocations.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+
+  const commonMistakes = Array.isArray(wordData.commonMistakes)
+    ? wordData.commonMistakes
+    : (typeof wordData.commonMistakes === 'string' && wordData.commonMistakes.trim())
+      ? [wordData.commonMistakes]
+      : (wordData.commonMistakes && typeof wordData.commonMistakes === 'object')
+        ? [wordData.commonMistakes]
+        : [];
+
+  const definition = safeStr(wordData.definition);
+  const contextMeaning = safeStr(wordData.contextMeaning);
+  const vibeCheck = safeStr(wordData.vibeCheck);
+  const origin = safeStr(wordData.origin);
+  const example = safeStr(wordData.example);
+
   return (
     <div style={{ padding: 'var(--sp-4) var(--sp-5) 0', cursor: 'auto' }}>
 
@@ -272,7 +351,7 @@ function WordContent({ wordData, playAudio }) {
           className="t-display"
           style={{ margin: 0 }}
         >
-          {wordData.word}
+          {safeStr(wordData.word)}
         </h2>
         <button
           onClick={playAudio}
@@ -292,7 +371,7 @@ function WordContent({ wordData, playAudio }) {
       </div>
 
       {/* 2. Context Meaning — shown first when present (most personalised) */}
-      {wordData.contextMeaning && (
+      {contextMeaning && (
         <div style={{
           marginBottom: 'var(--sp-5)',
           padding: 'var(--sp-3) var(--sp-4)',
@@ -304,69 +383,78 @@ function WordContent({ wordData, playAudio }) {
             In your context
           </p>
           <p style={{ fontSize: 'var(--type-body)', margin: 0, color: 'var(--text-secondary)', lineHeight: 'var(--type-body-lh)' }}>
-            {wordData.contextMeaning}
+            {contextMeaning}
           </p>
         </div>
       )}
 
       {/* 3. Definition — the lead, no label */}
-      <p style={{
-        fontSize: 'var(--type-lead)',
-        lineHeight: 'var(--type-lead-lh)',
-        letterSpacing: 'var(--type-lead-ls)',
-        color: 'var(--text-primary)',
-        marginBottom: 'var(--sp-6)',
-        maxWidth: '65ch',
-      }}>
-        {wordData.definition}
-      </p>
+      {definition && (
+        <p style={{
+          fontSize: 'var(--type-lead)',
+          lineHeight: 'var(--type-lead-lh)',
+          letterSpacing: 'var(--type-lead-ls)',
+          color: 'var(--text-primary)',
+          marginBottom: 'var(--sp-6)',
+          maxWidth: '65ch',
+        }}>
+          {definition}
+        </p>
+      )}
 
       {/* 4. Secondary sections — separated by space and weight, no boxes */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-5)' }}>
 
         {/* Register */}
-        {wordData.vibeCheck && (
+        {vibeCheck && (
           <div>
             <p className="t-label" style={{ marginBottom: 'var(--sp-1)' }}>Register</p>
             <p style={{ fontSize: 'var(--type-body)', color: 'var(--text-secondary)', margin: 0 }}>
-              {wordData.vibeCheck}
+              {vibeCheck}
             </p>
           </div>
         )}
 
         {/* Origin */}
-        {wordData.origin && (
+        {origin && (
           <div>
             <p className="t-label" style={{ marginBottom: 'var(--sp-1)' }}>Origin</p>
             <p style={{ fontSize: 'var(--type-body)', color: 'var(--text-secondary)', margin: 0, fontStyle: 'italic' }}>
-              {wordData.origin}
+              {origin}
             </p>
           </div>
         )}
 
         {/* Collocations */}
-        {wordData.collocations?.length > 0 && (
+        {collocations.length > 0 && (
           <div>
             <p className="t-label" style={{ marginBottom: 'var(--sp-2)' }}>Collocations</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-2)' }}>
-              {wordData.collocations.map((col, i) => (
-                <span key={i} style={{
-                  fontSize: 'var(--type-sm)',
-                  fontWeight: 500,
-                  padding: '4px var(--sp-3)',
-                  background: 'rgba(120,120,128,0.1)',
-                  borderRadius: 'var(--radius-pill)',
-                  color: 'var(--text-primary)',
-                }}>
-                  {col}
-                </span>
-              ))}
+              {collocations.map((col, i) => {
+                const colText = typeof col === 'string'
+                  ? col
+                  : (col && typeof col === 'object')
+                    ? (col.collocation || col.phrase || col.text || Object.values(col).find(v => typeof v === 'string') || JSON.stringify(col))
+                    : String(col);
+                return (
+                  <span key={i} style={{
+                    fontSize: 'var(--type-sm)',
+                    fontWeight: 500,
+                    padding: '4px var(--sp-3)',
+                    background: 'rgba(120,120,128,0.1)',
+                    borderRadius: 'var(--radius-pill)',
+                    color: 'var(--text-primary)',
+                  }}>
+                    {colText}
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* Example */}
-        {wordData.example && (
+        {example && (
           <div>
             <p className="t-label" style={{ marginBottom: 'var(--sp-1)' }}>Example</p>
             <p style={{
@@ -377,28 +465,57 @@ function WordContent({ wordData, playAudio }) {
               paddingLeft: 'var(--sp-3)',
               borderLeft: '2px solid var(--border-color)',
             }}>
-              "{wordData.example}"
+              "{example}"
             </p>
           </div>
         )}
 
         {/* Common traps — one inline block, one signal (warning border-left) */}
-        {wordData.commonMistakes?.length > 0 && (
+        {commonMistakes.length > 0 && (
           <div>
             <p className="t-label" style={{ marginBottom: 'var(--sp-2)' }}>Common traps</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
-              {wordData.commonMistakes.map((m, i) => (
-                <p key={i} style={{
-                  fontSize: 'var(--type-sm)',
-                  color: 'var(--text-secondary)',
-                  margin: 0,
-                  paddingLeft: 'var(--sp-3)',
-                  borderLeft: `2px solid var(--color-warning)`,
-                  lineHeight: 1.5,
-                }}>
-                  {m}
-                </p>
-              ))}
+              {commonMistakes.map((m, i) => {
+                let content = null;
+                if (typeof m === 'string') {
+                  content = m;
+                } else if (m && typeof m === 'object') {
+                  if (m.mistake && m.explanation) {
+                    content = (
+                      <>
+                        <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{m.mistake}: </strong>
+                        <span>{m.explanation}</span>
+                      </>
+                    );
+                  } else if (m.mistake || m.misuse || m.error) {
+                    const title = m.mistake || m.misuse || m.error;
+                    const desc = m.explanation || m.correction || m.fix;
+                    content = (
+                      <>
+                        <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{title}</strong>
+                        {desc ? `: ${desc}` : ''}
+                      </>
+                    );
+                  } else {
+                    content = Object.values(m).filter(v => typeof v === 'string').join(' — ') || JSON.stringify(m);
+                  }
+                } else {
+                  content = String(m || '');
+                }
+
+                return (
+                  <p key={i} style={{
+                    fontSize: 'var(--type-sm)',
+                    color: 'var(--text-secondary)',
+                    margin: 0,
+                    paddingLeft: 'var(--sp-3)',
+                    borderLeft: `2px solid var(--color-warning)`,
+                    lineHeight: 1.5,
+                  }}>
+                    {content}
+                  </p>
+                );
+              })}
             </div>
           </div>
         )}

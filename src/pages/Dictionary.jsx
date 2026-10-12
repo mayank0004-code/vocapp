@@ -5,8 +5,8 @@
  */
 import React, { useEffect, useState, useMemo } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
-import { getAllWords, deleteLearnedWord } from '../services/db';
-import { Loader2, Trash, ChevronDown } from '../components/Icons';
+import { listenToAllWords, deleteLearnedWord, listenToCraftStats } from '../services/db';
+import { Loader2, Trash, ChevronDown, CheckCircle, Award } from '../components/Icons';
 import WordSheet from '../components/WordSheet';
 import { springs } from '../motion/springs';
 
@@ -39,11 +39,14 @@ function MaturityDot({ interval }) {
 
 /* ── Relative interval label ─────────────────────────────── */
 function nextReviewLabel(nextReviewDate) {
-  if (!nextReviewDate) return '';
-  const diff = Math.round((nextReviewDate - Date.now()) / 86400000);
-  if (diff <= 0) return 'Due now';
-  if (diff === 1) return 'Due tomorrow';
-  return `Due in ${diff}d`;
+  if (!nextReviewDate) return 'Not reviewed';
+  const msLeft = nextReviewDate - Date.now();
+  if (msLeft <= 0) return 'Due now';
+  const hoursLeft = Math.ceil(msLeft / 3600000);
+  if (hoursLeft < 24) return `Due in ${hoursLeft}h`;
+  const days = Math.round(msLeft / 86400000);
+  if (days === 1) return 'Due tomorrow';
+  return `Due in ${days}d`;
 }
 
 /* ── Confirm delete button (two-step safety) ─────────────── */
@@ -88,44 +91,63 @@ export default function Dictionary({ currentUser }) {
   const [filter, setFilter]     = useState('All');
   const [expandedId, setExpandedId] = useState(null);
   const [error, setError]       = useState(null);
+  const [craftedWords, setCraftedWords] = useState(new Set());
 
   // WordSheet state — open expanded word in the shared sheet
   const [sheetWord, setSheetWord] = useState(null);
 
   useEffect(() => {
-    async function load() {
-      if (!currentUser) return;
-      try {
-        const all = await getAllWords(currentUser.uid);
-        // Sort: due-first, then alphabetical
-        all.sort((a, b) => {
-          const aDue = (a.nextReviewDate || 0) - Date.now();
-          const bDue = (b.nextReviewDate || 0) - Date.now();
-          if (aDue <= 0 && bDue > 0) return -1;
-          if (bDue <= 0 && aDue > 0) return 1;
-          return a.word.localeCompare(b.word);
-        });
-        setWords(all);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    if (!currentUser) return;
+    const unsub = listenToCraftStats(currentUser.uid, (stats) => {
+      setCraftedWords(new Set(stats?.craftedWords || []));
+    });
+    return () => unsub();
   }, [currentUser]);
 
-  const now = Date.now();
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsub = listenToAllWords(currentUser.uid, (all) => {
+      // Sort: due-first, then alphabetical
+      all.sort((a, b) => {
+        const aDue = typeof a.nextReviewDate === 'number' && a.nextReviewDate > 0 && a.nextReviewDate <= Date.now();
+        const bDue = typeof b.nextReviewDate === 'number' && b.nextReviewDate > 0 && b.nextReviewDate <= Date.now();
+        if (aDue && !bDue) return -1;
+        if (!aDue && bDue) return 1;
+        return a.word.localeCompare(b.word);
+      });
+      setWords(all);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [currentUser]);
+
+  const currentNow = Date.now();
+
+  const dueNowWords = useMemo(() => {
+    return words.filter(w => typeof w.nextReviewDate === 'number' && w.nextReviewDate > 0 && w.nextReviewDate <= currentNow);
+  }, [words, currentNow]);
+
+  const upcomingWords = useMemo(() => {
+    return words
+      .filter(w => typeof w.nextReviewDate === 'number' && w.nextReviewDate > currentNow)
+      .sort((a, b) => a.nextReviewDate - b.nextReviewDate);
+  }, [words, currentNow]);
 
   const filtered = useMemo(() => {
-    return words.filter(w => {
-      const matchSearch = !search || w.word.toLowerCase().includes(search.toLowerCase());
-      const matchFilter = filter === 'All'
-        || (filter === 'Due' && (w.nextReviewDate || 0) <= now)
-        || (filter === 'Mastered' && (w.interval || 0) >= 21);
-      return matchSearch && matchFilter;
-    });
-  }, [words, search, filter, now]);
+    const q = search.trim().toLowerCase();
+    const matchesSearch = (w) => !q || w.word.toLowerCase().includes(q);
+
+    if (filter === 'Due') {
+      return dueNowWords.filter(matchesSearch);
+    }
+
+    if (filter === 'Mastered') {
+      return words.filter(w => ((w.interval || 0) >= 21 || w.status === 'mastered') && matchesSearch(w));
+    }
+
+    // Default 'All'
+    return words.filter(matchesSearch);
+  }, [words, search, filter, dueNowWords]);
 
   const handleDelete = async (wordId) => {
     try {
@@ -164,31 +186,58 @@ export default function Dictionary({ currentUser }) {
       <div
         role="group"
         aria-label="Filter words"
-        style={{ display: 'flex', gap: 'var(--sp-2)', marginBottom: 'var(--sp-4)' }}
+        style={{ display: 'flex', gap: 'var(--sp-2)', marginBottom: 'var(--sp-4)', flexWrap: 'wrap', alignItems: 'center' }}
       >
-        {FILTERS.map(f => (
-          <button
-            key={f}
-            role="radio"
-            aria-checked={filter === f}
-            onClick={() => setFilter(f)}
-            style={{
-              padding: '4px var(--sp-3)',
-              borderRadius: 'var(--radius-pill)',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 'var(--type-sm)',
-              fontWeight: filter === f ? 600 : 400,
-              background: filter === f ? 'var(--accent-color)' : 'rgba(120,120,128,0.1)',
-              color: filter === f ? '#fff' : 'var(--text-secondary)',
-              transition: 'background 150ms ease, color 150ms ease',
-            }}
-          >
-            {f}
-          </button>
-        ))}
+        {FILTERS.map(f => {
+          let badge = null;
+          if (f === 'Due' && dueNowWords.length > 0) {
+            badge = dueNowWords.length;
+          }
+          return (
+            <button
+              key={f}
+              role="radio"
+              aria-checked={filter === f}
+              onClick={() => setFilter(f)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 'var(--sp-1)',
+                padding: '4px var(--sp-3)',
+                borderRadius: 'var(--radius-pill)',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 'var(--type-sm)',
+                fontWeight: filter === f ? 600 : 400,
+                background: filter === f ? 'var(--accent-color)' : 'rgba(120,120,128,0.1)',
+                color: filter === f ? '#fff' : 'var(--text-secondary)',
+                transition: 'background 150ms ease, color 150ms ease',
+              }}
+            >
+              <span>{f}</span>
+              {badge !== null && (
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: '1px 5px',
+                  borderRadius: 'var(--radius-pill)',
+                  background: filter === f ? '#fff' : 'var(--color-warning)',
+                  color: filter === f ? 'var(--accent-color)' : '#fff',
+                  marginLeft: 2,
+                }}>
+                  {badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
         <span style={{ marginLeft: 'auto', fontSize: 'var(--type-sm)', color: 'var(--text-tertiary)', alignSelf: 'center' }}>
-          {filtered.length} word{filtered.length !== 1 ? 's' : ''}
+          {filter === 'Due'
+            ? `${filtered.length} due`
+            : filter === 'Mastered'
+              ? `${filtered.length} mastered`
+              : `${filtered.length} word${filtered.length !== 1 ? 's' : ''}`
+          }
         </span>
       </div>
 
@@ -198,20 +247,121 @@ export default function Dictionary({ currentUser }) {
         </div>
       )}
 
+      {/* Due Banner when words are ready */}
+      {filter === 'Due' && filtered.length > 0 && !search && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: 'var(--sp-3) var(--sp-4)',
+          background: 'rgba(255, 149, 0, 0.08)',
+          border: '1px solid rgba(255, 149, 0, 0.25)',
+          borderRadius: 'var(--radius-lg)',
+          marginBottom: 'var(--sp-4)',
+        }}>
+          <div>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: 'var(--type-sm)', color: 'var(--text-primary)' }}>
+              {filtered.length} word{filtered.length !== 1 ? 's' : ''} ready for review
+            </p>
+            <p style={{ margin: 0, fontSize: 'var(--type-xs)', color: 'var(--text-secondary)' }}>
+              Test your memory to strengthen recall and extend intervals.
+            </p>
+          </div>
+          <button
+            className="btn btn-primary"
+            style={{ padding: '6px var(--sp-3)', fontSize: 'var(--type-sm)', minWidth: 100 }}
+            onClick={() => window.dispatchEvent(new CustomEvent('vocapp:switch-tab', { detail: 'quiz' }))}
+          >
+            Review now
+          </button>
+        </div>
+      )}
+
+      {/* Due Empty State when all caught up */}
+      {filter === 'Due' && filtered.length === 0 && !search && (
+        <div style={{
+          textAlign: 'center',
+          padding: 'var(--sp-10) var(--sp-6)',
+          background: 'rgba(52, 199, 89, 0.05)',
+          border: '1px solid rgba(52, 199, 89, 0.15)',
+          borderRadius: 'var(--radius-xl)',
+          marginBottom: 'var(--sp-4)',
+        }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%',
+            background: 'rgba(52, 199, 89, 0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto var(--sp-3)',
+            color: 'var(--color-success)'
+          }}>
+            <CheckCircle size={24} />
+          </div>
+          <h3 style={{ fontSize: 'var(--type-title)', fontWeight: 600, margin: '0 0 var(--sp-1)' }}>
+            All caught up for today!
+          </h3>
+          <p style={{ fontSize: 'var(--type-sm)', color: 'var(--text-secondary)', maxWidth: 360, margin: '0 auto var(--sp-4)', lineHeight: 1.45 }}>
+            {upcomingWords.length > 0
+              ? `No words are due for review right now. Next review is ${nextReviewLabel(upcomingWords[0].nextReviewDate)}.`
+              : 'No words are due for review right now.'}
+          </p>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setFilter('All')}
+          >
+            View all words ({words.length})
+          </button>
+        </div>
+      )}
+
+      {/* Mastered Empty State */}
+      {filter === 'Mastered' && filtered.length === 0 && !search && (
+        <div style={{
+          textAlign: 'center',
+          padding: 'var(--sp-10) var(--sp-6)',
+          background: 'rgba(120,120,128,0.06)',
+          borderRadius: 'var(--radius-xl)',
+          marginBottom: 'var(--sp-4)',
+        }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%',
+            background: 'rgba(0, 122, 255, 0.1)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto var(--sp-3)',
+            color: 'var(--accent-color)'
+          }}>
+            <Award size={24} />
+          </div>
+          <h3 style={{ fontSize: 'var(--type-title)', fontWeight: 600, margin: '0 0 var(--sp-1)' }}>
+            No mastered words yet
+          </h3>
+          <p style={{ fontSize: 'var(--type-sm)', color: 'var(--text-secondary)', maxWidth: 360, margin: '0 auto var(--sp-4)', lineHeight: 1.45 }}>
+            Words reach Mastered status once their spaced review interval reaches 21+ days. Keep reviewing your words consistently to master them!
+          </p>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setFilter('All')}
+          >
+            View all words ({words.length})
+          </button>
+        </div>
+      )}
+
       {/* Word List */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 'var(--sp-12) var(--sp-6)' }}>
-          <p style={{ fontSize: 'var(--type-body)', color: 'var(--text-secondary)' }}>
-            {words.length === 0
-              ? 'Your dictionary is empty. Look up your first word!'
-              : 'No words match this filter.'}
-          </p>
-        </div>
+        ((filter !== 'Mastered' && filter !== 'Due') || search) && (
+          <div style={{ textAlign: 'center', padding: 'var(--sp-12) var(--sp-6)' }}>
+            <p style={{ fontSize: 'var(--type-body)', color: 'var(--text-secondary)' }}>
+              {words.length === 0
+                ? 'Your dictionary is empty. Look up your first word!'
+                : search
+                  ? `No words match "${search}".`
+                  : 'No words match this filter.'}
+            </p>
+          </div>
+        )
       ) : (
         <div className="surface-grouped">
           {filtered.map((item, idx) => {
             const isExpanded = expandedId === item.id;
-            const isDue      = (item.nextReviewDate || 0) <= now;
+            const isDue      = typeof item.nextReviewDate === 'number' && item.nextReviewDate > 0 && item.nextReviewDate <= Date.now();
             return (
               <div key={item.id}>
                 {/* Row */}
@@ -237,9 +387,23 @@ export default function Dictionary({ currentUser }) {
                   <MaturityDot interval={item.interval} />
 
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 600, fontSize: 'var(--type-body)', margin: 0, textTransform: 'capitalize' }}>
-                      {item.word}
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                      <p style={{ fontWeight: 600, fontSize: 'var(--type-body)', margin: 0, textTransform: 'capitalize' }}>
+                        {item.word}
+                      </p>
+                      {craftedWords.has(item.word?.toLowerCase()) && (
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: '#af52de',
+                          background: 'rgba(175, 82, 222, 0.1)',
+                          padding: '2px 6px',
+                          borderRadius: 'var(--radius-pill)',
+                        }}>
+                          Crafted ✨
+                        </span>
+                      )}
+                    </div>
                     <p style={{ fontSize: 'var(--type-xs)', color: isDue ? 'var(--color-warning)' : 'var(--text-tertiary)', margin: 0, marginTop: 2 }}>
                       {nextReviewLabel(item.nextReviewDate)}
                     </p>

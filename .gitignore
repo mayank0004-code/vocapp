@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local backups
+backup_v1/
+*.tar.gz
+ui/ui_laptop/
+ui/ui_phone/
+ui/ui_tablet/
+.firebase/

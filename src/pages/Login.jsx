@@ -2,7 +2,7 @@
  * Login.jsx — Authentication screen.
  */
 import React, { useState } from 'react';
-import { BookOpenIcon } from '../components/Icons';
+import AppLogo from '../components/AppLogo';
 
 export default function Login({ login }) {
   const [error, setError] = useState(null);
@@ -22,7 +22,9 @@ export default function Login({ login }) {
     <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--sp-5)' }}>
       <div className="surface-raised" style={{ padding: 'var(--sp-8) var(--sp-6)', textAlign: 'center', maxWidth: 400, width: '100%' }}>
         
-        <BookOpenIcon size={48} style={{ color: 'var(--accent-color)', marginBottom: 'var(--sp-4)' }} />
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--sp-5)' }}>
+          <AppLogo size={76} variant="badge" />
+        </div>
         
         <h1 className="t-title" style={{ marginBottom: 'var(--sp-2)' }}>
           Vocapp

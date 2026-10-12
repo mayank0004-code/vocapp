@@ -168,7 +168,7 @@ export function Capture({
         <input
           id="capIn"
           className={`inp ${shake ? 'shake' : ''}`}
-          placeholder=""
+          placeholder="Type or paste a word"
           value={inputWord}
           onChange={(e) => setInputWord(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
@@ -191,7 +191,7 @@ export function Capture({
         <input
           id="capCtx"
           className="inp sm"
-          placeholder=""
+          placeholder="Sentence where you saw it (optional)"
           aria-label="Sentence where you found it (optional)"
           value={contextInput}
           onChange={(e) => setContextInput(e.target.value)}

@@ -5,6 +5,7 @@ import NavStackProvider, { useNav } from './NavStack';
 import TabBar from './TabBar';
 import TodayScreen from '../features/today/TodayScreen';
 import WordsScreen from '../features/words/WordsScreen';
+import PracticeHub from '../features/practice/PracticeHub';
 import Kit from '../pages/Kit';
 import { ToastContainer, showToast } from '../ui/Toast';
 import SessionOverlay from '../features/session/SessionOverlay';
@@ -127,10 +128,7 @@ function ShellContent({ currentUser, logout }) {
         )}
 
         {activeTab === 1 && (
-          <div style={{ padding: '80px 20px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '24px' }}>Practice</h2>
-            <p style={{ color: 'var(--mute)' }}>Practice Hub with 4 Drill Tiers lands in Phase 5.</p>
-          </div>
+          <PracticeHub onSwitchTab={setActiveTab} />
         )}
 
         {activeTab === 2 && (

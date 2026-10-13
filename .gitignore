@@ -30,3 +30,9 @@ ui/ui_laptop/
 ui/ui_phone/
 ui/ui_tablet/
 .firebase/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+functions/.env

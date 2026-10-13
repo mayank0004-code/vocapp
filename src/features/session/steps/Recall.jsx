@@ -2,70 +2,43 @@ import React, { useState, useEffect, useRef } from 'react';
 import { m } from 'framer-motion';
 import Button from '../../../ui/Button';
 import { triggerHaptic } from '../../../motion/haptics';
+import { maskTargetWord } from '../reviewQuestion';
 
 export function Recall({
   wordData,
+  question,
   reviewIndex = 1,
   totalReviews = 1,
-  onGrade = () => {}
+  onGrade = () => {},
+  onNext = () => {}
 }) {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [isRevealed, setIsRevealed] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [dragX, setDragX] = useState(0);
   const [isCommitted, setIsCommitted] = useState(false);
+  const [feedback, setFeedback] = useState(null); // { isCorrect, message }
   const [speaking, setSpeaking] = useState(false);
+  const advanceTimeoutRef = useRef(null);
+  const hasAdvancedRef = useRef(false);
 
   const headword = wordData?.word || '';
-  const definition = wordData?.def || wordData?.definition || wordData?.short || '';
-  const pos = wordData?.pos || wordData?.partOfSpeech || 'adjective';
-  const example = wordData?.example || wordData?.sentence || '';
-  const pairs = wordData?.pairs || wordData?.collocations || [];
-  const currentInterval = wordData?.interval || 1;
-  const nextInterval = currentInterval <= 1 ? 3 : currentInterval <= 3 ? 7 : currentInterval <= 7 ? 14 : currentInterval * 2;
-  const nextInLabel = `in ${nextInterval} days`;
+  const q = question || {};
+  const mask = (text, fallback) => maskTargetWord(text, headword, fallback);
+  const pos = wordData?.partOfSpeech || wordData?.pos || '';
+  // Mirrors updateWordSRS in services/db.js exactly
+  const currentInterval = wordData?.interval;
+  const nextInterval = currentInterval === 1 ? 3 : currentInterval === 3 ? 7 : currentInterval === 7 ? 14 : (currentInterval || 0) * 2;
+  const nextInLabel = Number.isFinite(nextInterval) && nextInterval > 0 ? `in ${nextInterval} days` : 'moves up';
 
-  // Parse context sentence with blank
-  const renderBlankContext = () => {
-    if (!example) return `“A sentence illustrating the meaning of this word.”`;
-    const regex = new RegExp(`\\b${headword}\\b`, 'i');
-    if (regex.test(example)) {
-      const parts = example.split(regex);
-      return (
-        <>
-          “{parts[0]}
-          <span
-            style={{
-              display: 'inline-block',
-              width: `${Math.max(60, headword.length * 10)}px`,
-              borderBottom: '2px solid var(--acc2)',
-              margin: '0 4px',
-              verticalAlign: 'baseline'
-            }}
-          />
-          {parts[1]}”
-        </>
-      );
-    }
-    return `“${example}”`;
-  };
+  useEffect(() => () => {
+    if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+  }, []);
 
-  const renderFilledContext = () => {
-    if (!example) return `“A sentence using ${headword}.”`;
-    const regex = new RegExp(`\\b${headword}\\b`, 'i');
-    if (regex.test(example)) {
-      const parts = example.split(regex);
-      return (
-        <>
-          “{parts[0]}
-          <b style={{ fontStyle: 'normal', color: 'var(--acc3)', fontWeight: 600 }}>
-            {headword}
-          </b>
-          {parts[1]}”
-        </>
-      );
-    }
-    return `“${example}”`;
+  const advance = () => {
+    if (hasAdvancedRef.current) return;
+    hasAdvancedRef.current = true;
+    if (advanceTimeoutRef.current) clearTimeout(advanceTimeoutRef.current);
+    onNext();
   };
 
   const handleSpeak = () => {
@@ -81,38 +54,59 @@ export function Recall({
     }
   };
 
+  // One-way flip, as in the classic review card
   const handleFlip = () => {
-    if (isCommitted) return;
-    setIsFlipped(prev => !prev);
-    setIsRevealed(true);
+    if (isCommitted || isFlipped) return;
+    setIsFlipped(true);
     triggerHaptic('light');
   };
 
-  const handleCommit = (isCorrect) => {
-    if (isCommitted) return;
+  const handleCommit = (isCorrect, isSwipe = false) => {
+    if (isCommitted || !isFlipped) return;
     setIsCommitted(true);
     triggerHaptic(isCorrect ? 'success' : 'error');
     onGrade(isCorrect);
+
+    if (isSwipe) {
+      advance();
+      return;
+    }
+    setFeedback({
+      isCorrect,
+      message: isCorrect ? 'Excellent active recall!' : `The target word was: ${headword}.`
+    });
+    if (isCorrect) {
+      advanceTimeoutRef.current = setTimeout(advance, 350);
+    }
   };
 
-  // Keyboard navigation: Space/Enter = flip, ArrowLeft = miss, ArrowRight = got
+  // Keyboard: Space flips, 1 = forgot, 2 = got it, Enter/Space = next after feedback
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (e.code === 'Space' || e.key === 'Enter') {
+      if (feedback && (e.key === 'Enter' || e.code === 'Space')) {
+        e.preventDefault();
+        advance();
+        return;
+      }
+      if (e.code === 'Space' && !isFlipped) {
         e.preventDefault();
         handleFlip();
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        if (isRevealed) handleCommit(false);
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        if (isRevealed) handleCommit(true);
+        return;
+      }
+      if (isFlipped && !feedback) {
+        if (e.key === '1' || e.key === 'ArrowLeft') {
+          e.preventDefault();
+          handleCommit(false);
+        } else if (e.key === '2' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          handleCommit(true);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isRevealed, isCommitted]);
+  }, [isFlipped, isCommitted, feedback]);
 
   // Stamp opacities based on dragX
   const missOpacity = Math.min(1, Math.max(0, -dragX / 80));
@@ -145,7 +139,7 @@ export function Recall({
         }}
       >
         <span>Recall · review {reviewIndex} of {totalReviews}</span>
-        <span>{wordData?.interval ? `SRS step ${wordData.interval}` : 'Fresh recall'}</span>
+        <span>{q.meaningLabel || 'Core Meaning'}{q.hasSecondaryMeaning ? ` (${q.activeMeaning === 'secondary' ? '2 of 2' : '1 of 2'})` : ''}</span>
       </div>
 
       {/* 3D Flashcard Deck Stage */}
@@ -165,14 +159,15 @@ export function Recall({
           onDrag={(_, info) => setDragX(info.offset.x)}
           onDragEnd={(_, info) => {
             setDragX(0);
-            if (!isRevealed) {
+            if (!isFlipped) {
               if (Math.abs(info.offset.x) < 10) handleFlip();
               return;
             }
-            if (info.offset.x < -100 || info.velocity.x < -500) {
-              handleCommit(false);
-            } else if (info.offset.x > 100 || info.velocity.x > 500) {
-              handleCommit(true);
+            if (isCommitted) return;
+            if (info.offset.x < -100 || info.velocity.x < -400) {
+              handleCommit(false, true);
+            } else if (info.offset.x > 100 || info.velocity.x > 400) {
+              handleCommit(true, true);
             }
           }}
           onClick={() => {
@@ -233,21 +228,22 @@ export function Recall({
                 }}
                 className="q"
               >
-                {definition}
+                “{mask(q.question || q.definition || wordData?.definition || '', 'Review this concept in your dictionary')}”
               </div>
 
-              <div
-                className="serif"
-                style={{
-                  fontStyle: 'italic',
-                  fontSize: '18px',
-                  lineHeight: 1.5,
-                  color: 'var(--fg2)',
-                  marginTop: '6px'
-                }}
-              >
-                {renderBlankContext()}
+              {q.relatesTo && (
+              <div style={{ padding: '10px 12px', borderRadius: '12px', background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--line)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--acc2)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '3px' }}>Relates to</div>
+                <div style={{ fontSize: '14px', color: 'var(--fg2)', lineHeight: 1.45 }}>{mask(q.relatesTo)}</div>
               </div>
+              )}
+
+              {q.memoryTrigger && (
+              <div style={{ padding: '10px 12px', borderRadius: '12px', background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--line)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '3px' }}>Memory anchor</div>
+                <div style={{ fontSize: '14px', color: 'var(--fg2)', lineHeight: 1.45 }}>{mask(q.memoryTrigger)}</div>
+              </div>
+              )}
 
               {/* Hint Button */}
               <div style={{ marginTop: 'auto' }}>
@@ -255,7 +251,7 @@ export function Recall({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowHint(prev => !prev);
+                    setShowHint(true);
                     triggerHaptic('light');
                   }}
                   style={{
@@ -276,7 +272,7 @@ export function Recall({
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 16v-4M12 8h.01" />
                   </svg>
-                  {showHint ? `Starts with “${headword[0]}…”` : 'Hint: first letter'}
+                  {showHint ? `Starts with: ${headword.slice(0, 1).toUpperCase()} ${headword.slice(1).replace(/./g, '•')}` : 'Hint: first letter'}
                 </button>
               </div>
 
@@ -371,42 +367,28 @@ export function Recall({
                 </button>
               </div>
 
-              <span style={{ fontSize: '14px', color: 'var(--fg3)', textTransform: 'lowercase' }}>
-                {pos}
-              </span>
+              {pos && (
+                <span style={{ fontSize: '14px', color: 'var(--fg3)', textTransform: 'lowercase' }}>
+                  {pos}
+                </span>
+              )}
 
-              <div
-                className="serif"
-                style={{
-                  fontStyle: 'italic',
-                  fontSize: '18px',
-                  lineHeight: 1.5,
-                  color: 'var(--fg2)',
-                  marginTop: '4px'
-                }}
-              >
-                {renderFilledContext()}
+              <div style={{ fontSize: '17px', lineHeight: 1.45, color: 'var(--fg)' }}>
+                {q.definition || wordData?.definition}
               </div>
 
-              {/* Collocations */}
-              {pairs.length > 0 && (
-                <div style={{ marginTop: 'auto', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {pairs.map((p, idx) => (
-                    <span
-                      key={idx}
-                      style={{
-                        padding: '5px 10px',
-                        borderRadius: '8px',
-                        background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid var(--line)',
-                        fontSize: '12.5px',
-                        color: 'var(--fg2)'
-                      }}
-                    >
-                      {p}
-                    </span>
-                  ))}
-                </div>
+              {(q.example || wordData?.example) && (
+              <div style={{ padding: '10px 12px', borderRadius: '12px', background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--line)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--acc2)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '3px' }}>In context</div>
+                <div style={{ fontSize: '14px', color: 'var(--fg2)', lineHeight: 1.45 }}>“{q.example || wordData?.example}”</div>
+              </div>
+              )}
+
+              {q.hasSecondaryMeaning && q.secondaryMeaning && (
+              <div style={{ padding: '10px 12px', borderRadius: '12px', background: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--line)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '3px' }}>{`Also remember (${q.activeMeaning === 'secondary' ? 'core meaning' : 'alternate meaning'})`}</div>
+                <div style={{ fontSize: '14px', color: 'var(--fg2)', lineHeight: 1.45 }}>{q.secondaryMeaning}</div>
+              </div>
               )}
             </div>
           </div>
@@ -462,7 +444,32 @@ export function Recall({
 
       {/* ACTION CONTROLS */}
       <div style={{ marginTop: '18px' }}>
-        {!isRevealed ? (
+        {feedback ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                padding: '12px 14px',
+                borderRadius: '14px',
+                background: feedback.isCorrect ? 'var(--okbg)' : 'var(--orgbg)',
+                color: feedback.isCorrect ? 'var(--ok)' : 'var(--org2)',
+                fontSize: '14px',
+                lineHeight: 1.45
+              }}
+            >
+              <b style={{ fontWeight: 600 }}>{feedback.message}</b>
+              {!feedback.isCorrect && (q.definition || wordData?.definition) && (
+                <div style={{ marginTop: '4px', color: 'var(--fg2)' }}>
+                  Remember: <b style={{ fontWeight: 600 }}>{headword}</b> means {q.definition || wordData?.definition}
+                </div>
+              )}
+            </div>
+            <Button variant="light" size="default" onClick={advance}>
+              Next word →
+            </Button>
+          </div>
+        ) : !isFlipped ? (
           <Button
             variant="light"
             size="default"
@@ -516,11 +523,11 @@ export function Recall({
           fontSize: '12.5px',
           color: 'var(--mute)',
           marginTop: '10px',
-          opacity: isRevealed ? 1 : 0,
+          opacity: isFlipped && !feedback ? 1 : 0,
           transition: 'opacity 0.25s'
         }}
       >
-        Swipe left or right to grade · Keys: <kbd style={{ padding: '2px 4px', borderRadius: '4px', background: 'var(--card2)' }}>←</kbd> <kbd style={{ padding: '2px 4px', borderRadius: '4px', background: 'var(--card2)' }}>→</kbd> <kbd style={{ padding: '2px 4px', borderRadius: '4px', background: 'var(--card2)' }}>Space</kbd>
+        Swipe left or right to grade · Keys: <kbd style={{ padding: '2px 4px', borderRadius: '4px', background: 'var(--card2)' }}>1</kbd> forgot · <kbd style={{ padding: '2px 4px', borderRadius: '4px', background: 'var(--card2)' }}>2</kbd> got it
       </div>
     </div>
   );

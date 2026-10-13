@@ -480,6 +480,12 @@ button:disabled {
   animation: cpop 0.45s var(--ease) both;
   animation-delay: calc(var(--i) * 12ms);
 }
+@media (min-width: 1024px) {
+  .cal i {
+    aspect-ratio: auto;
+    height: 38px;
+  }
+}
 @keyframes cpop {
   from { opacity: 0; transform: scale(0.4); }
   to { opacity: 1; transform: none; }

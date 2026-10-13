@@ -1,5 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useWords, useStats, useVault, useAnthology, useData } from '../../data/DataProvider';
+import { PILLARS, getRecommendedPillar, pillarOfMistake } from '../practice/craft';
+import { DrillPage } from '../practice/DrillPage';
+import { AnthologyPage } from '../practice/AnthologyPage';
 import { useNav } from '../../app/NavStack';
 import Chip from '../../ui/Chip';
 import BellPopover from './BellPopover';
@@ -20,11 +23,12 @@ export function TodayScreen({
 }) {
   const { activationKey } = useTabActivation(isActive);
   const { currentUser } = useData();
-  const { dueWords, savedWords, allWords } = useWords();
+  const { dueWords, savedWords } = useWords();
   const { stats, todayPlan, currentStreak, highestStreak } = useStats();
-  const isTodayDone = !!(todayPlan && todayPlan.itemsDone >= 12);
-  const displayStreak = isTodayDone ? Math.max(2, currentStreak) : 1;
-  const { openMistakes } = useVault();
+  const displayStreak = currentStreak || 0;
+  const { openMistakes, allMistakes } = useVault();
+  const tuneUpPillar = PILLARS[getRecommendedPillar(allMistakes)];
+  const drillsRemaining = Math.max(0, 2 - (todayPlan?.drillsDone || 0));
   const { anthology } = useAnthology();
   const { push } = useNav();
   const { isLaptop, isTablet } = useLayout();
@@ -42,18 +46,22 @@ export function TodayScreen({
   }, []);
 
   // Expiring word for bell indicator (any saved word expiring within 2 days)
-  const expiringWord = useMemo(() => {
-    return savedWords.find(w => typeof w.expiresInDays === 'number' && w.expiresInDays <= 2) || null;
+  const expiringWords = useMemo(() => {
+    return savedWords
+      .filter(w => typeof w.expiresInDays === 'number' && w.expiresInDays <= 2)
+      .sort((a, b) => a.expiresInDays - b.expiresInDays);
   }, [savedWords]);
+  const expiringWord = expiringWords[0] || null;
 
-  // Target word for writing practice card
-  const targetWord = useMemo(() => {
-    const unmastered = allWords.find(w => (w.interval || 0) < 21 && w.status !== 'mastered');
-    return unmastered?.word || 'albeit';
-  }, [allWords]);
+  // Writing practice in the daily session uses the oldest saved-for-later word,
+  // the same pending list the classic Today page practises from.
+  const targetWordData = useMemo(() => {
+    return [...savedWords].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))[0] || null;
+  }, [savedWords]);
+  const targetWord = targetWordData?.word || '';
 
   // User avatar letter
-  const avatarLetter = (currentUser?.displayName?.[0] || currentUser?.email?.[0] || 'D').toUpperCase();
+  const avatarLetter = (currentUser?.displayName?.[0] || currentUser?.email?.[0] || '?').toUpperCase();
 
   const handleOpenSettings = () => {
     push({
@@ -73,6 +81,24 @@ export function TodayScreen({
       props: { word },
       hideTab: false
     });
+  };
+
+  const handleStoryAction = (actionType, data) => {
+    if (actionType === 'practice-word') {
+      onStartSession('practice-word', { wordData: savedWords.find(w => w.word === data?.word) || data });
+    } else if (actionType === 'reviews') {
+      onStartSession('reviews', {});
+    } else if (actionType === 'fix-slip' && data) {
+      push({
+        id: `drill-fix-${data.id}`,
+        title: 'Drill',
+        component: DrillPage,
+        props: { pillar: pillarOfMistake(data), initialTier: 3, mistake: data },
+        hideTab: true
+      });
+    } else if (actionType === 'anthology') {
+      push({ id: 'anthology', title: 'Anthology', component: AnthologyPage, hideTab: true });
+    }
   };
 
   // Frosted topbar interpolation: clamp((scrollTop - 20) / 34, 0, 1)
@@ -268,7 +294,8 @@ export function TodayScreen({
         isOpen={isBellOpen}
         onClose={() => setIsBellOpen(false)}
         expiringWord={expiringWord}
-        onPractice={(word) => onStartSession('practice-word', { word })}
+        expiringCount={expiringWords.length}
+        onPractice={(item) => onStartSession('practice-word', { wordData: item })}
       />
 
       {/* Main Content Layout: 2 Columns on Tablet & Laptop, 1 Column on Phone */}
@@ -289,20 +316,21 @@ export function TodayScreen({
             <SessionCard
               dueWordsCount={dueWords.length}
               targetWord={targetWord}
-              drillsRemaining={2}
-              itemsDone={todayPlan.itemsDone}
-              streak={currentStreak}
+              drillsRemaining={drillsRemaining}
+              tuneUpLabel={tuneUpPillar?.label || 'Flow'}
+              itemsDone={todayPlan?.itemsDone || 0}
+              streak={displayStreak}
               highestStreak={highestStreak}
-              activeDates={stats.activeDates || []}
+              activeDates={stats?.activeDates || []}
               activationKey={activationKey}
-              onStartSession={() => onStartSession('full', {})}
+              onStartSession={() => onStartSession('full', { wordData: targetWordData })}
               onOnlyReviews={() => onStartSession('reviews', {})}
               onOnlyDrills={() => onStartSession('drills', {})}
             />
 
             <SavedList
               savedWords={savedWords}
-              onPractice={(item) => onStartSession('practice-word', { word: item.word })}
+              onPractice={(item) => onStartSession('practice-word', { wordData: item })}
               onOpenWord={(item) => handleOpenWord(item)}
             />
           </div>
@@ -315,21 +343,11 @@ export function TodayScreen({
               vaultSlips={openMistakes}
               anthologySentences={anthology}
               activationKey={activationKey}
-              onStoryAction={(actionType, data) => {
-                if (actionType === 'practice-word') {
-                  onStartSession('practice-word', { word: data.word });
-                } else if (actionType === 'reviews') {
-                  onStartSession('reviews', {});
-                } else if (actionType === 'fix-slip') {
-                  onSwitchTab(1);
-                } else if (actionType === 'anthology') {
-                  onSwitchTab(1);
-                }
-              }}
+              onStoryAction={handleStoryAction}
             />
 
             <Capture
-              onPractice={(wordData) => onStartSession('practice-word', { word: wordData.word })}
+              onPractice={(wordData) => onStartSession('practice-word', { wordData })}
               onOpenInWords={(wordData) => handleOpenWord(wordData)}
             />
           </div>
@@ -343,44 +361,35 @@ export function TodayScreen({
             vaultSlips={openMistakes}
             anthologySentences={anthology}
             activationKey={activationKey}
-            onStoryAction={(actionType, data) => {
-              if (actionType === 'practice-word') {
-                onStartSession('practice-word', { word: data.word });
-              } else if (actionType === 'reviews') {
-                onStartSession('reviews', {});
-              } else if (actionType === 'fix-slip') {
-                onSwitchTab(1);
-              } else if (actionType === 'anthology') {
-                onSwitchTab(1);
-              }
-            }}
+            onStoryAction={handleStoryAction}
           />
 
-          {/* 2. Unified Session Card */}
+          {/* 2. Word Capture first on phone, for quick access */}
+          <Capture
+            onPractice={(wordData) => onStartSession('practice-word', { wordData })}
+            onOpenInWords={(wordData) => handleOpenWord(wordData)}
+          />
+
+          {/* 3. Unified Session Card */}
           <SessionCard
             dueWordsCount={dueWords.length}
             targetWord={targetWord}
-            drillsRemaining={2}
-            itemsDone={todayPlan.itemsDone}
-            streak={currentStreak}
+            drillsRemaining={drillsRemaining}
+            tuneUpLabel={tuneUpPillar?.label || 'Flow'}
+            itemsDone={todayPlan?.itemsDone || 0}
+            streak={displayStreak}
             highestStreak={highestStreak}
-            activeDates={stats.activeDates || []}
+            activeDates={stats?.activeDates || []}
             activationKey={activationKey}
-            onStartSession={() => onStartSession('full', {})}
+            onStartSession={() => onStartSession('full', { wordData: targetWordData })}
             onOnlyReviews={() => onStartSession('reviews', {})}
             onOnlyDrills={() => onStartSession('drills', {})}
-          />
-
-          {/* 3. Word Capture with Spell-Correction */}
-          <Capture
-            onPractice={(wordData) => onStartSession('practice-word', { word: wordData.word })}
-            onOpenInWords={(wordData) => handleOpenWord(wordData)}
           />
 
           {/* 4. Saved for Later Shelf (7-Day Expiry) */}
           <SavedList
             savedWords={savedWords}
-            onPractice={(item) => onStartSession('practice-word', { word: item.word })}
+            onPractice={(item) => onStartSession('practice-word', { wordData: item })}
             onOpenWord={(item) => handleOpenWord(item)}
           />
         </div>

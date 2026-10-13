@@ -21,6 +21,11 @@ function ShellContent({ currentUser, logout }) {
   const { isLaptop } = useLayout();
 
   const handleStartSession = (mode = 'full', payload = {}) => {
+    // Drills live in the Practice tab (classic Studio engine), not in a session.
+    if (mode === 'drills') {
+      setActiveTab(1);
+      return;
+    }
     setSessionConfig({ isOpen: true, mode, payload });
   };
 
@@ -28,8 +33,8 @@ function ShellContent({ currentUser, logout }) {
     setSessionConfig(prev => ({ ...prev, isOpen: false }));
   };
 
-  const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'User';
-  const avatarLetter = (displayName[0] || 'U').toUpperCase();
+  const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || '';
+  const avatarLetter = (displayName[0] || '').toUpperCase();
 
   // Global keyboard shortcuts: 1-4 for tabs
   React.useEffect(() => {
@@ -154,6 +159,7 @@ function ShellContent({ currentUser, logout }) {
               </svg>
               <span>Settings</span>
             </button>
+            {displayName && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 14px' }}>
               <div
                 style={{
@@ -186,6 +192,7 @@ function ShellContent({ currentUser, logout }) {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </aside>
       )}
@@ -239,6 +246,7 @@ function ShellContent({ currentUser, logout }) {
         >
           <WordsScreen
             isActive={activeTab === 2}
+            onStartSession={handleStartSession}
           />
         </div>
 
@@ -283,7 +291,7 @@ function ShellContent({ currentUser, logout }) {
       <SessionOverlay
         isOpen={sessionConfig.isOpen}
         mode={sessionConfig.mode}
-        targetWord={sessionConfig.payload?.word || 'albeit'}
+        targetWordData={sessionConfig.payload?.wordData || null}
         weakWords={sessionConfig.payload?.weak || []}
         onClose={handleCloseSession}
         onGoToWords={() => {

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useWords } from '../../data/DataProvider';
+import { useWords, useData } from '../../data/DataProvider';
 import { useNav } from '../../app/NavStack';
 import WordRow from './WordRow';
 import WordDetailPage from './WordDetailPage';
@@ -8,10 +8,14 @@ import Button from '../../ui/Button';
 import { Empty } from '../../ui/Feedback';
 import { useLayout } from '../../motion/useLayout';
 import { useTabActivation } from '../../motion/useTabActivation';
+import { isWordDue, nextReviewLabel } from './wordStatus';
+import { safeStr } from './wordFormat';
 
-export function WordsScreen({ isActive = true }) {
+export function WordsScreen({ isActive = true, onStartSession = () => {} }) {
   const { activationKey } = useTabActivation(isActive);
   const { allWords, dueWords, savedWords, masteredWords } = useWords();
+  const { craft } = useData();
+  const craftedSet = useMemo(() => new Set((craft?.craftedWords || []).map(w => String(w).toLowerCase())), [craft]);
   const { push } = useNav();
   const { isLaptop } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,8 +28,8 @@ export function WordsScreen({ isActive = true }) {
   // Due-first, then alphabetical sorting for "All" tab
   const sortedAllWords = useMemo(() => {
     return [...allWords].sort((a, b) => {
-      const aIsDue = typeof a.nextReviewDate === 'number' && a.nextReviewDate <= Date.now();
-      const bIsDue = typeof b.nextReviewDate === 'number' && b.nextReviewDate <= Date.now();
+      const aIsDue = isWordDue(a);
+      const bIsDue = isWordDue(b);
       if (aIsDue && !bIsDue) return -1;
       if (!aIsDue && bIsDue) return 1;
       return (a.word || '').localeCompare(b.word || '');
@@ -36,16 +40,27 @@ export function WordsScreen({ isActive = true }) {
     if (!query) return list;
     return list.filter(w =>
       (w.word || '').toLowerCase().includes(query) ||
-      (w.short || w.definition || '').toLowerCase().includes(query)
+      safeStr(w.definition).toLowerCase().includes(query)
     );
   };
 
+  // Real "next review" hint for the empty Due tab (soonest upcoming nextReviewDate)
+  const nextDueText = useMemo(() => {
+    const now = Date.now();
+    const upcoming = allWords
+      .map(w => w.nextReviewDate)
+      .filter(t => typeof t === 'number' && t > now);
+    if (upcoming.length === 0) return 'Nothing due right now.';
+    const label = nextReviewLabel(Math.min(...upcoming), now);
+    return `Nothing due right now. Next review: ${label.replace(/^Due /, '')}.`;
+  }, [allWords]);
+
   const tabSets = useMemo(() => [
     { id: 'all', label: 'All', count: allWords.length, list: filterList(sortedAllWords), emptyText: 'No words in your dictionary yet.' },
-    { id: 'due', label: 'Due', count: dueWords.length, list: filterList(dueWords), emptyText: 'Nothing due right now. The next review is in about 1 hour.' },
+    { id: 'due', label: 'Due', count: dueWords.length, list: filterList(dueWords), emptyText: nextDueText },
     { id: 'saved', label: 'Saved', count: savedWords.length, list: filterList(savedWords), emptyText: 'No saved words. Use “Save for later” after a lookup.' },
     { id: 'mastered', label: 'Mastered', count: masteredWords.length, list: filterList(masteredWords), emptyText: 'No mastered words yet. Words reach Mastered after 21+ day intervals.' }
-  ], [allWords, dueWords, savedWords, masteredWords, sortedAllWords, query]);
+  ], [allWords, dueWords, savedWords, masteredWords, sortedAllWords, query, nextDueText]);
 
   const currentTabList = tabSets[activeTab]?.list || [];
 
@@ -201,9 +216,7 @@ export function WordsScreen({ isActive = true }) {
           <Button
             variant="pri"
             size="sm"
-            onClick={() => {
-              window.dispatchEvent(new CustomEvent('vocapp:open-session', { detail: { mode: 'reviews' } }));
-            }}
+            onClick={() => onStartSession('reviews')}
           >
             Review the {dueWords.length} due {dueWords.length === 1 ? 'word' : 'words'}
           </Button>
@@ -245,6 +258,7 @@ export function WordsScreen({ isActive = true }) {
                         <WordRow
                           word={wordItem}
                           index={idx}
+                          isCrafted={craftedSet.has((wordItem.word || '').toLowerCase())}
                           onClick={() => handleWordClick(wordItem)}
                         />
                       </div>

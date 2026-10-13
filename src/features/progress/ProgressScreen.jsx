@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { useWords, useStats, useVault, useAnthology } from '../../data/DataProvider';
+import { useData, useWords, useStats, useVault, useAnthology } from '../../data/DataProvider';
+import { CANONICAL_HABITS } from '../../services/db';
+import { pillarOfMistake } from '../practice/craft';
 import { useNav } from '../../app/NavStack';
 import { triggerHaptic } from '../../motion/haptics';
 import Button from '../../ui/Button';
@@ -9,63 +11,43 @@ import { DrillPage } from '../practice/DrillPage';
 import { useLayout } from '../../motion/useLayout';
 import { useTabActivation } from '../../motion/useTabActivation';
 import CountUp from '../../ui/CountUp';
+import {
+  COACHING_GUIDES,
+  buildMonthCells,
+  findRelevantMistake,
+  pillarSkill,
+  rankProgressPct,
+  reviewAccuracy,
+  sortedPillarSlips
+} from './insights';
 
-const HABITS = [
-  {
-    title: 'Repeating the same sentence openers',
-    tip: 'Start with a prepositional phrase or a gerund.',
-    meta: 'Flow · seen 4 times · last with “avail”',
-    k: 1,
-    tag: 'Coaching'
-  },
-  {
-    title: 'Using “very” or “extremely”',
-    tip: 'Reach for a stronger verb or adjective instead.',
-    meta: 'Context · seen 3 times · last with “abstruse”',
-    k: 2,
-    tag: 'Needs work'
-  },
-  {
-    title: 'Mixing past and present',
-    tip: 'Pick one time frame and stay in it.',
-    meta: 'Grammar · seen 2 times · last with “relic”',
-    k: 0,
-    tag: 'Needs work'
-  },
-  {
-    title: 'Over-complicated wording',
-    tip: 'Choose the plainest way to say it.',
-    meta: 'Flow · seen 3 times · last with “patronage”',
-    k: 1,
-    tag: 'Coaching'
-  }
-];
+const PILLAR_UI = {
+  grammar: { name: 'Grammar', color: '#7C88FF' },
+  flow: { name: 'Flow', color: '#5BD69B' },
+  context: { name: 'Context', color: '#FF9F2E' },
+  punctuation: { name: 'Punctuation', color: '#B9C0FF' }
+};
+// Skill index order used by Practice (PracticeHub SKILLS): 0 grammar, 1 flow, 2 context, 3 punctuation
+const SKILL_KEYS = ['grammar', 'flow', 'context', 'punctuation'];
 
-const SKILLS_INFO = [
-  { name: 'Grammar', level: 2, pct: 55 },
-  { name: 'Flow', level: 1, pct: 40 },
-  { name: 'Context', level: 1, pct: 30 },
-  { name: 'Punctuation', level: 1, pct: 15 }
-];
-
-const SPEC_DATA = [
-  { name: 'Context', k: 2, count: 15, pct: 65, org: true },
-  { name: 'Flow', k: 1, count: 6, pct: 26 },
-  { name: 'Grammar', k: 0, count: 2, pct: 9 },
-  { name: 'Punctuation', k: 3, count: 0, pct: 0 }
-];
+const HABIT_TAGS = {
+  mastering: { label: 'Mastering', bg: 'var(--okbg)', color: 'var(--ok)' },
+  under_coaching: { label: 'Coaching', bg: 'var(--accbg)', color: 'var(--acc2)' },
+  needs_attention: { label: 'Needs work', bg: 'var(--orgbg)', color: 'var(--org2)' }
+};
 
 export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
   const { activationKey } = useTabActivation(isActive);
   const { allWords = [], masteredWords = [] } = useWords();
-  const { stats, todayPlan, currentStreak = 1, highestStreak = 30, craftLevelInfo } = useStats();
-  const { openMistakes = [], fixedMistakes = [], allMistakes = [] } = useVault();
+  const { stats, craft, totalCraftXp = 0, totalCraftSolved = 0, craftLevelInfo } = useStats();
+  const { allMistakes = [], openMistakes = [], fixedMistakes = [], mistakeCounts } = useVault();
+  const { styleProfile } = useData();
   const { anthology = [] } = useAnthology();
   const { push } = useNav();
   const { isLaptop, isTablet } = useLayout();
 
-  const isTodayDone = !!(todayPlan && todayPlan.itemsDone >= 12);
-  const effectiveStreak = isTodayDone ? Math.max(2, currentStreak) : 1;
+  const currentStreak = stats?.currentStreak || 0;
+  const highestStreak = stats?.highestStreak || 0;
 
   const [scrollTop, setScrollTop] = useState(0);
   const [xpBarFilled, setXpBarFilled] = useState(false);
@@ -82,16 +64,53 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
   // Frosted topbar interpolation
   const topBarProgress = Math.min(1, Math.max(0, (scrollTop - 20) / 34));
 
-  const xp = stats?.xp || stats?.totalPracticed || 180;
-  const drillsSolved = stats?.drillsDone || stats?.drills || 12;
-  const rank = craftLevelInfo?.rank || 'Craftsman';
-  const levelNum = craftLevelInfo?.level || 2;
+  // Rank (Insights.jsx hero card): calcCraftLevel over total craft XP + combined tier completions
+  const rankInfo = craftLevelInfo || { level: 1, rank: 'Apprentice', currentBase: 0, nextThreshold: 100 };
+  const rankPct = rankProgressPct(totalCraftXp, rankInfo);
 
-  const rankText = xp >= 300
-    ? 'Wordsmith unlocked'
-    : `Wordsmith needs ${Math.max(0, 300 - xp)} more XP and ${Math.max(0, 3 - fixedMistakes.length)} Vault fixes`;
+  // Per-pillar skill levels (Studio / PracticeHub formula)
+  const skills = useMemo(
+    () => SKILL_KEYS.map((key) => ({ key, name: PILLAR_UI[key].name, ...pillarSkill(craft?.[key]) })),
+    [craft]
+  );
+  const skillsPractised = SKILL_KEYS.filter((key) => (craft?.[key]?.solved || 0) > 0).length;
 
-  const totalSlips = allMistakes.length || 23;
+  const accuracy = useMemo(() => reviewAccuracy(stats), [stats]);
+
+  // Vault counts: same open / fixed split the Vault page shows
+  const unredeemedCount = openMistakes.length;
+  const redeemedCount = fixedMistakes.length;
+
+  // Writing spectrum (Insights.jsx sortedTags / totalMistakes / topTag)
+  const sortedTags = useMemo(() => sortedPillarSlips(mistakeCounts), [mistakeCounts]);
+  const totalSlips = sortedTags.reduce((sum, [, c]) => sum + c, 0);
+  const maxSlips = sortedTags[0]?.[1] || 1;
+  const topTag = sortedTags[0]?.[1] > 0 ? sortedTags[0][0] : null;
+  const guide = topTag ? COACHING_GUIDES[topTag] : null;
+  const relevantMistake = useMemo(() => findRelevantMistake(allMistakes, topTag), [allMistakes, topTag]);
+  const slipPct = (c) => (totalSlips > 0 ? Math.round((c / totalSlips) * 100) : 0);
+
+  // Habits (Insights.jsx HabitsUnderCoachingSection)
+  const habits = useMemo(
+    () =>
+      Object.values(styleProfile?.habits || {})
+        .filter((h) => h && (h.count > 0 || h.status === 'mastering'))
+        .sort((a, b) => (b.count || 0) - (a.count || 0))
+        .map((h) => {
+          const def = CANONICAL_HABITS[h.key || 'other'] || CANONICAL_HABITS.other;
+          const pillar = SKILL_KEYS.includes(h.pillar) ? h.pillar : def.pillar || 'flow';
+          const count = h.count || 0;
+          return {
+            key: h.key || def.key,
+            pillar,
+            title: h.title || def.title,
+            tip: def.ruleOfThumb,
+            meta: `${PILLAR_UI[pillar].name} · seen ${count} ${count === 1 ? 'time' : 'times'}${h.lastWord ? ` · last with “${h.lastWord}”` : ''}`,
+            tag: HABIT_TAGS[h.status] || HABIT_TAGS.needs_attention
+          };
+        }),
+    [styleProfile]
+  );
 
   const handleOpenVault = () => {
     triggerHaptic('light');
@@ -106,7 +125,7 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
             title: 'Drill',
             component: DrillPage,
             props: {
-              skillId: m.skillId || 0,
+              pillar: pillarOfMistake(m),
               initialTier: 3,
               mistake: m
             },
@@ -128,29 +147,24 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
     });
   };
 
-  const handlePracticeSkill = (k) => {
+  // Open a drill for the given pillar (falls back to the Practice tab when none).
+  const handlePracticeSkill = (pillar) => {
     triggerHaptic('light');
-    onSwitchTab(1);
+    if (!SKILL_KEYS.includes(pillar)) {
+      onSwitchTab(1);
+      return;
+    }
+    push({
+      id: `drill-${SKILL_KEYS.indexOf(pillar)}-1`,
+      title: PILLAR_UI[pillar].name,
+      component: DrillPage,
+      props: { skillId: SKILL_KEYS.indexOf(pillar), pillar, initialTier: 1 },
+      hideTab: true
+    });
   };
 
-  // 35 Calendar Cells for month heatmap
-  const calendarCells = useMemo(() => {
-    const cells = [];
-    const todayDate = new Date().getDate();
-    for (let i = 0; i < 35; i++) {
-      const dayOfMonth = i - 2; // Offset for Monday start
-      let state = '';
-      if (dayOfMonth < 1 || dayOfMonth > 31) {
-        state = 'x'; // outside month
-      } else if (dayOfMonth === 11 || dayOfMonth === 12 || (stats?.activeDates && stats.activeDates.includes(dayOfMonth))) {
-        state = 'on';
-      } else if (dayOfMonth === todayDate) {
-        state = isTodayDone ? 'on' : 'today';
-      }
-      cells.push({ index: i, state });
-    }
-    return cells;
-  }, [stats?.activeDates, isTodayDone]);
+  // Current month, Monday first, from stats.activeDates ('YYYY-MM-DD')
+  const calendarCells = useMemo(() => buildMonthCells(stats?.activeDates), [stats?.activeDates]);
 
   // Sub-components for flexible multi-column rendering
   const StreakCard = (
@@ -159,9 +173,9 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
         <div>
           <span className="lab">Streak</span>
           <span className="big num">
-            <CountUp value={effectiveStreak} enabled={isActive} duration={600} /> {effectiveStreak === 1 ? 'day' : 'days'}
+            <CountUp value={currentStreak} enabled={isActive} duration={600} /> {currentStreak === 1 ? 'day' : 'days'}
           </span>
-          <small>Best: {highestStreak} days · 1 streak freeze ready</small>
+          <small>Best: {highestStreak} {highestStreak === 1 ? 'day' : 'days'}</small>
         </div>
         <span style={{ color: 'var(--warn)', marginTop: '4px' }}>
           <svg
@@ -197,6 +211,7 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
           <i
             key={c.index}
             className={c.state}
+            title={c.date || undefined}
             style={{ '--i': c.index }}
           />
         ))}
@@ -205,7 +220,11 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
   );
 
   const MetricTiles = (
-    <div key={`tiles-${activationKey}`} className="tiles" style={{ margin: 0 }}>
+    <div
+      key={`tiles-${activationKey}`}
+      className="tiles"
+      style={isLaptop ? { margin: 0, gridColumn: '1 / -1', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '20px' } : { margin: 0 }}
+    >
       <button
         className="tile press card-cascade"
         style={{ '--i': 0 }}
@@ -216,10 +235,10 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
       >
         <span>Words</span>
         <b className="num">
-          <CountUp value={allWords.length || 84} enabled={isActive} duration={700} />
+          <CountUp value={allWords.length} enabled={isActive} duration={700} />
         </b>
         <small>
-          <CountUp value={masteredWords.length || 12} enabled={isActive} duration={700} /> mastered
+          <CountUp value={masteredWords.length} enabled={isActive} duration={700} /> mastered
         </small>
       </button>
 
@@ -233,9 +252,9 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
       >
         <span>Drills solved</span>
         <b className="num">
-          <CountUp value={stats?.drillsDone || stats?.drills || 12} enabled={isActive} duration={700} />
+          <CountUp value={totalCraftSolved} enabled={isActive} duration={700} />
         </b>
-        <small>across 4 skills</small>
+        <small>{skillsPractised > 0 ? `across ${skillsPractised} ${skillsPractised === 1 ? 'skill' : 'skills'}` : 'none yet'}</small>
       </button>
 
       <button
@@ -248,9 +267,9 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
       >
         <span>Accuracy</span>
         <b className="num">
-          <CountUp value={82} suffix="%" enabled={isActive} duration={750} />
+          {accuracy ? <CountUp value={accuracy.pct} suffix="%" enabled={isActive} duration={750} /> : '–'}
         </b>
-        <small>last 30 days</small>
+        <small>{accuracy ? accuracy.label : 'no reviews yet'}</small>
       </button>
 
       <button
@@ -260,10 +279,10 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
       >
         <span>Vault slips</span>
         <b className="num">
-          <CountUp value={openMistakes.length || 3} enabled={isActive} duration={700} />
+          <CountUp value={unredeemedCount} enabled={isActive} duration={700} />
         </b>
         <small>
-          <CountUp value={fixedMistakes.length || 5} enabled={isActive} duration={700} /> fixed
+          <CountUp value={redeemedCount} enabled={isActive} duration={700} /> fixed
         </small>
       </button>
     </div>
@@ -272,22 +291,22 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
   const RankCard = (
     <section key={`rank-${activationKey}`} className="pcard rank card-cascade" aria-label="Writing level" style={{ margin: 0, '--i': 1 }}>
       <div className="r1">
-        <span>Writing rank 2 of 5</span>
-        <b>{rank}</b>
+        <span>Writing rank {rankInfo.level} of 5</span>
+        <b>{rankInfo.rank}</b>
       </div>
       <span className="bar">
         <i
           style={{
-            width: xpBarFilled ? `${Math.min(100, Math.max(10, (xp / 300) * 100))}%` : '0%',
+            width: xpBarFilled ? `${rankPct}%` : '0%',
             transition: 'width 0.85s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
         />
       </span>
-      <small>{rankText}</small>
+      <small>{totalCraftXp} craft XP{rankInfo.nextRequirement ? ` · ${rankInfo.nextRequirement}` : ''}</small>
       <ul className="skl">
-        {SKILLS_INFO.map((s, i) => (
-          <li key={s.name}>
-            <button className="press" onClick={() => handlePracticeSkill(i)}>
+        {skills.map((s) => (
+          <li key={s.key}>
+            <button className="press" onClick={() => handlePracticeSkill(s.key)}>
               <div className="grow">
                 <div className="r">
                   <b style={{ fontWeight: 500 }}>{s.name}</b>
@@ -313,27 +332,33 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
         <h2>Where your slips happen</h2>
         <span>{totalSlips} total</span>
       </div>
-      <div className="sbar" aria-hidden="true">
-        <span style={{ width: '42%', background: '#7C88FF' }} title="Grammar 42%" />
-        <span style={{ width: '28%', background: '#FF9F2E' }} title="Context 28%" />
-        <span style={{ width: '18%', background: '#5BD69B' }} title="Flow 18%" />
-        <span style={{ width: '12%', background: '#B9C0FF' }} title="Punctuation 12%" />
-      </div>
-      <div className="leg">
-        <span><i style={{ background: '#7C88FF' }} />Grammar 42%</span>
-        <span><i style={{ background: '#FF9F2E' }} />Context 28%</span>
-        <span><i style={{ background: '#5BD69B' }} />Flow 18%</span>
-        <span><i style={{ background: '#B9C0FF' }} />Punctuation 12%</span>
-      </div>
+      {totalSlips === 0 ? (
+        <p style={{ margin: '12px 0 0', fontSize: '14px', color: 'var(--fg3)', lineHeight: 1.5 }}>
+          No unassisted slips logged yet. As you finish drills in Practice, your grammar, flow, context and punctuation profile builds up here.
+        </p>
+      ) : (
+        <>
+          <div className="sbar" aria-hidden="true">
+            {sortedTags.filter(([, c]) => c > 0).map(([key, c]) => (
+              <span key={key} style={{ width: `${(c / totalSlips) * 100}%`, background: PILLAR_UI[key].color }} title={`${PILLAR_UI[key].name} ${slipPct(c)}%`} />
+            ))}
+          </div>
+          <div className="leg">
+            {sortedTags.map(([key, c]) => (
+              <span key={key}><i style={{ background: PILLAR_UI[key].color }} />{PILLAR_UI[key].name} {slipPct(c)}%</span>
+            ))}
+          </div>
+        </>
+      )}
       <div style={{ marginTop: '14px', borderTop: '0.5px solid var(--line)', paddingTop: '6px' }}>
-        {SPEC_DATA.map((p) => (
-          <button key={p.name} className="press" onClick={() => handlePracticeSkill(p.k)}>
+        {sortedTags.map(([key, c]) => (
+          <button key={key} className="press" onClick={() => handlePracticeSkill(key)}>
             <div className="r">
-              <span style={{ color: 'var(--fg)' }}>{p.name}</span>
-              <span>{p.count} · {p.pct}%</span>
+              <span style={{ color: 'var(--fg)' }}>{PILLAR_UI[key].name}</span>
+              <span>{c} · {slipPct(c)}%</span>
             </div>
-            <span className={`bar ${p.org ? 'org' : ''}`} style={{ width: '100%' }}>
-              <i style={{ width: xpBarFilled ? `${p.pct}%` : '0%', transition: 'width 0.85s cubic-bezier(0.16, 1, 0.3, 1)' }} />
+            <span className={`bar ${key === topTag ? 'org' : ''}`} style={{ width: '100%' }}>
+              <i style={{ width: xpBarFilled && totalSlips > 0 ? `${(c / maxSlips) * 100}%` : '0%', transition: 'width 0.85s cubic-bezier(0.16, 1, 0.3, 1)' }} />
             </span>
           </button>
         ))}
@@ -343,28 +368,38 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
 
   const FocusCard = (
     <section key={`focus-${activationKey}`} className="pcard focus card-cascade" aria-label="Focus area" style={{ margin: 0, '--i': 3 }}>
-      <span className="lab">Focus area · Context &amp; register</span>
-      <h2>Put each word where it feels at home</h2>
-      <p>Most of your slips come from formal words in casual sentences, or stiff phrasing where plain words would do.</p>
-      <div className="two">
-        <div>
-          <b>Say who did it</b>
-          <span>“We decided”, not “a decision was made”.</span>
-        </div>
-        <div>
-          <b>Match the room</b>
-          <span>Formal words for formal writing.</span>
-        </div>
-      </div>
-      <div className="ex">
-        <span>From your practice with “veil”</span>
-        <span className="o">✗ A veil of secrecy was put by the company on the deal.</span>
-        <span className="b">✓ The company drew a veil of secrecy over the deal.</span>
-      </div>
+      {guide ? (
+        <>
+          <span className="lab">Focus area · {guide.category}</span>
+          <h2>{guide.headline}</h2>
+          <p>{guide.explanation}</p>
+          <div className="two">
+            {guide.checks.map((c) => (
+              <div key={c.title}>
+                <b>{c.title}</b>
+                <span>{c.desc}</span>
+              </div>
+            ))}
+          </div>
+          {relevantMistake?.originalSentence && (
+            <div className="ex">
+              <span>{relevantMistake.word ? `From your practice with “${relevantMistake.word}”` : 'From your practice'}</span>
+              <span className="o">✗ {relevantMistake.originalSentence}</span>
+              {relevantMistake.reframedSentence && <span className="b">✓ {relevantMistake.reframedSentence}</span>}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <span className="lab">Focus area</span>
+          <h2>No focus area yet</h2>
+          <p>Once you log a few slips in Practice drills, the skill that trips you up most will show here with rules of thumb to try.</p>
+        </>
+      )}
       <Button
         variant="pri"
         size="sm"
-        onClick={() => handlePracticeSkill(2)}
+        onClick={() => handlePracticeSkill(topTag)}
         style={{
           alignSelf: 'flex-start',
           width: 'auto',
@@ -372,7 +407,7 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
           marginTop: '4px'
         }}
       >
-        Practise Context
+        {topTag ? `Practise ${PILLAR_UI[topTag].name}` : 'Start practising'}
       </Button>
     </section>
   );
@@ -381,54 +416,53 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
     <section className="pcard habits" aria-label="Habits to work on" style={{ margin: 0 }}>
       <div className="hd">
         <h2>Habits to work on</h2>
-        <span>4 tracked</span>
+        <span>{habits.length} tracked</span>
       </div>
       <ul>
-        {HABITS.map((h, idx) => (
-          <li key={idx}>
-            <button
-              className="press"
-              onClick={() => handlePracticeSkill(h.k)}
-            >
-              <div className="grow">
-                <b>{h.title}</b>
-                <span className="tp">{h.tip}</span>
-                <span className="mt">{h.meta}</span>
-              </div>
-              <span
-                className="htag"
-                style={{
-                  background: h.tag === 'Coaching' ? 'var(--accbg)' : 'var(--orgbg)',
-                  color: h.tag === 'Coaching' ? 'var(--acc2)' : 'var(--org2)'
-                }}
-              >
-                {h.tag}
-              </span>
-            </button>
+        {habits.length === 0 ? (
+          <li>
+            <p style={{ margin: 0, padding: '12px 0', fontSize: '14px', color: 'var(--fg3)', lineHeight: 1.5 }}>
+              No recurring habits flagged yet. As you practise drills, your writing coach will track patterns like run-on sentences, comma splices or tense drift here.
+            </p>
           </li>
-        ))}
+        ) : (
+          habits.map((h) => (
+            <li key={h.key}>
+              <button className="press" onClick={() => handlePracticeSkill(h.pillar)}>
+                <div className="grow">
+                  <b>{h.title}</b>
+                  {h.tip && <span className="tp">{h.tip}</span>}
+                  <span className="mt">{h.meta}</span>
+                </div>
+                <span className="htag" style={{ background: h.tag.bg, color: h.tag.color }}>
+                  {h.tag.label}
+                </span>
+              </button>
+            </li>
+          ))
+        )}
       </ul>
     </section>
   );
 
   const DuoCard = (
-    <div className="duo" style={{ margin: 0 }}>
+    <div className="duo" style={isLaptop ? { margin: 0, gridTemplateColumns: '1fr', gridAutoRows: '1fr', gap: '20px' } : { margin: 0 }}>
       <button
         onClick={handleOpenVault}
         className="press"
-        style={{ border: '1px solid var(--line)' }}
+        style={{ border: '1px solid var(--line)', justifyContent: isLaptop ? 'center' : undefined }}
       >
         <b>Mistake Vault</b>
-        <span>{openMistakes.length} to fix · {fixedMistakes.length} fixed</span>
+        <span>{unredeemedCount} to fix · {redeemedCount} fixed</span>
       </button>
 
       <button
         onClick={handleOpenAnthology}
         className="press"
-        style={{ border: '1px solid var(--line)' }}
+        style={{ border: '1px solid var(--line)', justifyContent: isLaptop ? 'center' : undefined }}
       >
         <b>Anthology</b>
-        <span>{anthology.length} saved sentences</span>
+        <span>{anthology.length} saved {anthology.length === 1 ? 'sentence' : 'sentences'}</span>
       </button>
     </div>
   );
@@ -493,34 +527,25 @@ export function ProgressScreen({ isActive = true, onSwitchTab = () => {} }) {
           </h1>
         </header>
 
-        {/* 3 Columns on Laptop, 2 Columns on Tablet, 1 Column on Phone */}
+        {/* Laptop: metric strip on top, then row-aligned card pairs so both columns end evenly.
+            Tablet: 2 columns. Phone: 1 column. */}
         {isLaptop ? (
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
               gap: '20px',
-              alignItems: 'start'
+              alignItems: 'stretch',
+              paddingBottom: '32px'
             }}
           >
-            {/* Col 1: Streak & Writing Level */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {StreakCard}
-              {RankCard}
-            </div>
-
-            {/* Col 2: Metrics, Slips Breakdown & Focus Area */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {MetricTiles}
-              {SlipsCard}
-              {FocusCard}
-            </div>
-
-            {/* Col 3: Habits & Duo Launchers */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {HabitsCard}
-              {DuoCard}
-            </div>
+            {MetricTiles}
+            {StreakCard}
+            {RankCard}
+            {SlipsCard}
+            {FocusCard}
+            {HabitsCard}
+            {DuoCard}
           </div>
         ) : isTablet ? (
           <div

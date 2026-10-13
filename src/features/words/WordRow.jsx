@@ -1,27 +1,24 @@
 import React from 'react';
 import { m } from 'framer-motion';
 import StrengthBars from '../../ui/StrengthBars';
+import { getWordStrength, isWordDue, nextReviewLabel, savedLabel } from './wordStatus';
+import { safeStr } from './wordFormat';
 
 export function WordRow({
-  word, // { word, short, definition, due, isDue, hot, crafted, interval, status }
+  word, // Firestore vocabulary doc: { word, definition, interval, nextReviewDate, createdAt, status }
   index = 0,
   onClick,
+  isCrafted = false,
   style = {}
 }) {
   const isSaved = word.status === 'pending';
   const headword = word.word || '';
-  const definition = word.short || word.definition || '';
+  const definition = safeStr(word.definition);
 
-  // Interval strength mapping: interval 1 -> 1, 3 -> 2, 7 -> 3, 14+ -> 4
-  const getIntervalStrength = (interval) => {
-    if (!interval || interval <= 1) return 1;
-    if (interval <= 3) return 2;
-    if (interval <= 7) return 3;
-    return 4;
-  };
-
-  const strength = isSaved ? 0 : getIntervalStrength(word.interval);
-  const isHot = word.isDue || word.isExpiringSoon || word.dueLabel?.includes('Expires');
+  const strength = getWordStrength(word);
+  const isDue = !isSaved && isWordDue(word);
+  const statusLabel = isSaved ? savedLabel(word) : nextReviewLabel(word.nextReviewDate);
+  const isHot = isDue || (isSaved && statusLabel.startsWith('Expires'));
 
   return (
     <m.div
@@ -56,9 +53,9 @@ export function WordRow({
               fontWeight: isHot ? 600 : 400
             }}
           >
-            {word.dueLabel || (word.isDue ? 'Due now' : word.interval ? `in ${word.interval}d` : '')}
+            {statusLabel}
           </span>
-          {word.crafted && (
+          {isCrafted && (
             <span
               style={{
                 fontSize: '11px',

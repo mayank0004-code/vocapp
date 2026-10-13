@@ -1,67 +1,129 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
 import { useWords, useData } from '../../data/DataProvider';
-import { updateWordSRS, saveLearnedWord, recordDailyActivity } from '../../services/db';
+import {
+  getDueWords,
+  updateWordSRS,
+  saveLearnedWord,
+  recordReviewResult,
+  getUserEnglishLevel,
+  getWordBankQuestions,
+  updateQuestionBankResult,
+  recordTodayProgress
+} from '../../services/db';
 import Recall from './steps/Recall';
 import Write from './steps/Write';
 import Done from './steps/Done';
 import WordDetailPage from '../words/WordDetailPage';
 import { useLayout } from '../../motion/useLayout';
+import { buildLocalQuestion, shuffleArray, nextReviewLabel } from './reviewQuestion';
+
+// Fields DataProvider derives for display only; never persist them.
+const DERIVED_FIELDS = ['expiresInDays', 'dueLabel'];
 
 export function SessionOverlay({
   isOpen = false,
   mode = 'full', // 'full' | 'reviews' | 'practice-word' | 'weak'
-  targetWord = 'albeit',
+  targetWordData = null,
   weakWords = [],
   onClose = () => {},
   onGoToWords = () => {}
 }) {
-  if (!isOpen) return null;
-
   const { currentUser } = useData();
-  const { dueWords, allWords } = useWords();
+  const { allWords } = useWords();
   const { isLaptop, isTablet } = useLayout();
 
   const [stepIdx, setStepIdx] = useState(0);
   const [results, setResults] = useState([]);
   const [activeWordDetail, setActiveWordDetail] = useState(null);
+  // The review queue is snapshotted when the session opens (like the classic
+  // Review page), so live Firestore updates can't reshuffle it mid-session.
+  const [queue, setQueue] = useState([]);
+  const [queueLoading, setQueueLoading] = useState(true);
+  const [question, setQuestion] = useState(null);
+  const bankIdRef = useRef(null);
+  const userLevelRef = useRef(1);
 
-  // Build steps list based on mode
-  const steps = useMemo(() => {
-    const list = [];
+  const targetWord = targetWordData?.word || '';
 
-    if (mode === 'reviews') {
-      const wordsToReview = dueWords.length > 0 ? dueWords : allWords.slice(0, 5);
-      wordsToReview.forEach(w => list.push({ kind: 'recall', wordData: w }));
-    } else if (mode === 'weak') {
-      const weakList = weakWords.length > 0
-        ? weakWords.map(w => allWords.find(item => item.word === w) || { word: w })
-        : allWords.slice(0, 3);
-      weakList.forEach(w => list.push({ kind: 'recall', wordData: w }));
-    } else if (mode === 'practice-word') {
-      list.push({ kind: 'write', word: targetWord });
-    } else {
-      // Full session
-      const reviewSlice = dueWords.length > 0 ? dueWords.slice(0, 5) : allWords.slice(0, 5);
-      reviewSlice.forEach(w => list.push({ kind: 'recall', wordData: w }));
-      list.push({ kind: 'write', word: targetWord || 'albeit' });
-    }
-
-    list.push({ kind: 'done' });
-    return list;
-  }, [mode, dueWords, allWords, targetWord, weakWords]);
-
-  // Reset steps when opened
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      // Reset while closed so the next open never paints a stale session
       setStepIdx(0);
       setResults([]);
       setActiveWordDetail(null);
+      setQueue([]);
+      setQueueLoading(true);
+      return;
     }
-  }, [isOpen, mode]);
+
+    const uid = currentUser?.uid;
+    if (!uid) {
+      setQueueLoading(false);
+      return;
+    }
+    let cancelled = false;
+
+    getUserEnglishLevel(uid).then(res => {
+      if (res?.level) userLevelRef.current = res.level;
+    }).catch(() => {});
+
+    if (mode === 'reviews' || mode === 'full') {
+      setQueueLoading(true);
+      getDueWords(uid)
+        .then(due => { if (!cancelled) setQueue(shuffleArray(due)); })
+        .catch(err => console.error(err))
+        .finally(() => { if (!cancelled) setQueueLoading(false); });
+    } else if (mode === 'weak') {
+      const wanted = new Set(weakWords.map(w => String(w?.word || w).toLowerCase()));
+      setQueue(shuffleArray(allWords.filter(w => wanted.has((w.word || '').toLowerCase()))));
+      setQueueLoading(false);
+    } else {
+      setQueueLoading(false);
+    }
+
+    return () => { cancelled = true; };
+  }, [isOpen, mode, currentUser?.uid]);
+
+  const steps = useMemo(() => {
+    const list = queue.map(w => ({ kind: 'recall', wordData: w }));
+    if ((mode === 'practice-word' || mode === 'full') && targetWord) {
+      list.push({ kind: 'write', wordData: targetWordData });
+    }
+    list.push({ kind: 'done' });
+    return list;
+  }, [queue, mode, targetWord, targetWordData]);
+
+  const currentStep = steps[stepIdx] || { kind: 'done' };
+  const currentRecallWord = currentStep.kind === 'recall' ? currentStep.wordData : null;
+
+  // Build the flashcard exactly like the classic Review page: instant local
+  // question, upgraded to the user's question-bank flashcard when one exists.
+  useEffect(() => {
+    bankIdRef.current = null;
+    if (!currentRecallWord) {
+      setQuestion(null);
+      return;
+    }
+    const local = buildLocalQuestion(currentRecallWord);
+    setQuestion(local);
+    if (!currentUser?.uid) return;
+    let cancelled = false;
+    getWordBankQuestions(currentUser.uid, currentRecallWord.word)
+      .then(existing => {
+        const bank = (existing || []).find(q => q.type === 'flashcard');
+        if (bank && !cancelled) {
+          bankIdRef.current = bank.id || null;
+          setQuestion({ ...local, ...bank, type: 'flashcard' });
+        }
+      })
+      .catch(err => console.warn('Question bank lookup failed:', err));
+    return () => { cancelled = true; };
+  }, [currentRecallWord?.id, currentRecallWord?.word, currentUser?.uid]);
 
   // Global Escape key to end session
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose();
@@ -69,9 +131,7 @@ export function SessionOverlay({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  const currentStep = steps[stepIdx] || { kind: 'done' };
+  }, [isOpen, onClose]);
 
   // Calculate session weights
   const totalWeight = useMemo(() => {
@@ -90,44 +150,64 @@ export function SessionOverlay({
     }, 0);
   }, [steps, stepIdx]);
 
-  const handleRecallGrade = async (isCorrect, wordItem) => {
-    setResults(prev => [...prev, { kind: 'recall', word: wordItem.word, ok: isCorrect }]);
+  // Grading persists in the background, exactly like the classic Review page.
+  const handleRecallGrade = (isCorrect) => {
+    const wordItem = currentRecallWord;
+    if (!wordItem) return;
+    setResults(prev => [...prev, {
+      kind: 'recall',
+      id: wordItem.id,
+      word: wordItem.word,
+      definition: wordItem.definition || '',
+      interval: wordItem.interval || 1,
+      ok: isCorrect
+    }]);
 
-    if (currentUser?.uid && wordItem.word) {
-      try {
-        await updateWordSRS(currentUser.uid, wordItem.word, isCorrect);
-        await recordDailyActivity(currentUser.uid);
-      } catch (err) {
-        console.error('Failed to update SRS progress', err);
-      }
+    const uid = currentUser?.uid;
+    if (!uid || !wordItem.id) return;
+    updateWordSRS(uid, wordItem.id, isCorrect, wordItem.interval).catch(err => {
+      console.warn('Background updateWordSRS deferred:', err);
+    });
+    recordReviewResult(uid, isCorrect, userLevelRef.current).catch(err => {
+      console.warn('Background recordReviewResult deferred:', err);
+    });
+    // v2-only: feeds the Today card's daily ring (stats.today)
+    recordTodayProgress(uid, 'review');
+    if (bankIdRef.current) {
+      updateQuestionBankResult(uid, bankIdRef.current, isCorrect).catch(err => {
+        console.warn('updateQuestionBankResult error:', err);
+      });
     }
-
-    setStepIdx(prev => prev + 1);
   };
 
-  const handleWriteComplete = async (payload) => {
-    setResults(prev => [...prev, { kind: 'write', word: targetWord, ok: true, payload }]);
+  const handleRecallNext = () => setStepIdx(prev => prev + 1);
 
-    if (currentUser?.uid && targetWord) {
+  const handleWriteComplete = async (sentences) => {
+    if (currentUser?.uid && targetWordData?.word) {
+      const wordToSave = { ...targetWordData, ...sentences };
+      DERIVED_FIELDS.forEach(k => delete wordToSave[k]);
       try {
-        await saveLearnedWord(currentUser.uid, {
-          word: targetWord,
-          factualSentence: payload.sentences[0] || '',
-          personalSentence: payload.sentences[1] || '',
-          questionSentence: payload.sentences[2] || '',
-          contextSentence: payload.contextSentence || '',
-          interval: 1,
-          repetition: 1,
-          easeFactor: 2.5
-        });
-        await recordDailyActivity(currentUser.uid);
+        await saveLearnedWord(currentUser.uid, wordToSave);
+        recordTodayProgress(currentUser.uid, 'word');
       } catch (err) {
         console.error('Failed to save learned word', err);
       }
     }
-
+    setResults(prev => [...prev, { kind: 'write', word: targetWord, ok: true }]);
     setStepIdx(prev => prev + 1);
   };
+
+  const handleReviewWeak = () => {
+    const missedIds = new Set(results.filter(r => r.kind === 'recall' && !r.ok).map(r => r.id || r.word));
+    const pool = allWords.length > 0 ? allWords : queue;
+    const weak = pool.filter(w => missedIds.has(w.id) || missedIds.has(w.word));
+    if (weak.length === 0) return;
+    setQueue(shuffleArray(weak));
+    setResults([]);
+    setStepIdx(0);
+  };
+
+  if (!isOpen) return null;
 
   const modeTitle = mode === 'reviews'
     ? 'Reviews only'
@@ -245,6 +325,11 @@ export function SessionOverlay({
           flexDirection: 'column'
         }}
       >
+        {queueLoading ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="spin" aria-label="Loading reviews" />
+          </div>
+        ) : (
         <AnimatePresence mode="wait">
           {currentStep.kind === 'recall' && (
             <m.div
@@ -256,10 +341,15 @@ export function SessionOverlay({
               style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
             >
               <Recall
+                key={currentStep.wordData?.id || stepIdx}
                 wordData={currentStep.wordData}
+                question={(question?.word || '').toLowerCase() === (currentStep.wordData?.word || '').toLowerCase()
+                  ? question
+                  : buildLocalQuestion(currentStep.wordData)}
                 reviewIndex={stepIdx + 1}
                 totalReviews={steps.filter(s => s.kind === 'recall').length}
                 onGrade={handleRecallGrade}
+                onNext={handleRecallNext}
               />
             </m.div>
           )}
@@ -274,9 +364,9 @@ export function SessionOverlay({
               style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
             >
               <Write
-                word={currentStep.word || targetWord}
+                wordData={currentStep.wordData}
                 onComplete={handleWriteComplete}
-                onOpenDetails={(w) => setActiveWordDetail(allWords.find(item => item.word === w) || { word: w })}
+                onOpenDetails={() => setActiveWordDetail(allWords.find(item => item.word === targetWord.toLowerCase()) || targetWordData)}
               />
             </m.div>
           )}
@@ -292,14 +382,11 @@ export function SessionOverlay({
             >
               <Done
                 results={results}
-                xpGained={30}
                 mode={mode}
                 targetWord={targetWord}
+                nextReview={nextReviewLabel(allWords)}
                 onClose={onClose}
-                onReviewWeak={() => {
-                  setResults([]);
-                  setStepIdx(0);
-                }}
+                onReviewWeak={handleReviewWeak}
                 onGoToWords={() => {
                   onClose();
                   onGoToWords();
@@ -308,6 +395,7 @@ export function SessionOverlay({
             </m.div>
           )}
         </AnimatePresence>
+        )}
       </main>
 
       {/* Embedded Word Detail Sub-Sheet if opened from Write */}
@@ -386,11 +474,11 @@ export function SessionOverlay({
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Didn't know</span>
-            <span style={{ padding: '2px 6px', background: 'var(--card2)', border: '1px solid var(--line)', borderRadius: '4px', fontSize: '11px' }}>←</span>
+            <span style={{ padding: '2px 6px', background: 'var(--card2)', border: '1px solid var(--line)', borderRadius: '4px', fontSize: '11px' }}>1</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>Knew it</span>
-            <span style={{ padding: '2px 6px', background: 'var(--card2)', border: '1px solid var(--line)', borderRadius: '4px', fontSize: '11px' }}>→</span>
+            <span style={{ padding: '2px 6px', background: 'var(--card2)', border: '1px solid var(--line)', borderRadius: '4px', fontSize: '11px' }}>2</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>End session</span>

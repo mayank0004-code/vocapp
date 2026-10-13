@@ -4,11 +4,12 @@ import Button from '../../ui/Button';
 
 export function SessionCard({
   dueWordsCount = 0,
-  targetWord = 'albeit',
+  targetWord = '',
   drillsRemaining = 2,
+  tuneUpLabel = 'Flow',
   itemsDone = 0,
-  streak = 1,
-  highestStreak = 30,
+  streak = 0,
+  highestStreak = 0,
   activeDates = [],
   activationKey = 0,
   onStartSession = () => {},
@@ -20,6 +21,16 @@ export function SessionCard({
   // Week days calculation
   const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const todayDayIdx = new Date().getDay();
+  // Real activity for each day of the current week (activeDates are 'YYYY-MM-DD')
+  const activeSet = new Set(activeDates || []);
+  const dateKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const weekKeys = dayNames.map((_, idx) => {
+    const d = new Date();
+    d.setDate(d.getDate() + (idx - todayDayIdx));
+    return dateKey(d);
+  });
+  const todayActive = activeSet.has(weekKeys[todayDayIdx]);
+  const bestStreak = Math.max(highestStreak || 0, streak || 0);
 
   return (
     <section
@@ -117,7 +128,9 @@ export function SessionCard({
         >
           <i style={{ width: '8px', height: '8px', borderRadius: '4px', background: '#B9C0FF', flexShrink: 0 }} />
           <span>
-            Write 3 sentences with <em className="serif" style={{ fontSize: '17px' }}>{targetWord}</em>
+            {targetWord
+              ? <>Write 3 sentences with <em className="serif" style={{ fontSize: '17px' }}>{targetWord}</em></>
+              : 'Save a word to practise writing with it'}
           </span>
         </li>
 
@@ -134,7 +147,7 @@ export function SessionCard({
         >
           <i style={{ width: '8px', height: '8px', borderRadius: '4px', background: '#FFB054', flexShrink: 0 }} />
           <span>
-            {drillsRemaining > 0 ? `Daily tune-up: ${drillsRemaining} Grammar drills` : 'Daily tune-up complete'}
+            {drillsRemaining > 0 ? `Daily tune-up: ${drillsRemaining} ${tuneUpLabel} drill${drillsRemaining === 1 ? '' : 's'}` : 'Daily tune-up complete'}
           </span>
         </li>
       </ul>
@@ -174,7 +187,7 @@ export function SessionCard({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', fontSize: '12px', color: 'var(--mute)' }}>
           {dayNames.map((name, idx) => {
             const isToday = idx === todayDayIdx;
-            const isCompleted = isToday ? isSessionDone : idx < todayDayIdx;
+            const isCompleted = activeSet.has(weekKeys[idx]);
 
             return (
               <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
@@ -205,8 +218,10 @@ export function SessionCard({
         </div>
         <p style={{ margin: 0, fontSize: '13px', color: 'var(--fg3)', textAlign: 'center' }}>
           {isSessionDone
-            ? `${Math.max(2, streak)}-day streak · best ${highestStreak}. See you tomorrow.`
-            : `Finish today to make it a 2-day streak · best ${highestStreak}`}
+            ? `${streak}-day streak · best ${bestStreak}. See you tomorrow.`
+            : todayActive
+            ? `${streak}-day streak · best ${bestStreak}`
+            : `Practise today to make it a ${(streak || 0) + 1}-day streak · best ${bestStreak}`}
         </p>
       </div>
     </section>

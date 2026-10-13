@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import StoriesViewer from './StoriesViewer';
+import { formatWhen, expiryPhrase } from './when';
+import { safeStr } from '../words/wordFormat';
 
 export function Stories({
   dueWords = [],
@@ -26,7 +28,7 @@ export function Stories({
       const next = new Set(prev).add(id);
       try {
         localStorage.setItem('vocapp.seenStories', JSON.stringify([...next]));
-      } catch (_) {}
+      } catch { /* storage unavailable */ }
       return next;
     });
   };
@@ -34,50 +36,65 @@ export function Stories({
   // Build dynamic story items
   const stories = [];
 
-  // 1. Expiring / hot saved word
-  const hotSaved = savedWords.find(w => w.expiresInDays <= 2) || savedWords[0];
+  // 1. Saved word closest to expiring (oldest createdAt)
+  const hotSaved = [...savedWords].sort(
+    (a, b) => (a.expiresInDays ?? 99) - (b.expiresInDays ?? 99) || (a.createdAt || 0) - (b.createdAt || 0)
+  )[0];
   if (hotSaved) {
+    const savedWhen = formatWhen(hotSaved.createdAt);
+    const expiring = typeof hotSaved.expiresInDays === 'number' && hotSaved.expiresInDays <= 2;
     stories.push({
       id: `saved-${hotSaved.word}`,
       label: hotSaved.word,
-      kind: hotSaved.expiresInDays <= 2 ? `Saved · expires in ${hotSaved.expiresInDays}d` : 'Saved yesterday',
+      kind: expiring
+        ? `Saved · ${expiryPhrase(hotSaved.expiresInDays)}`
+        : savedWhen ? `Saved ${savedWhen}` : 'Saved for later',
+      when: savedWhen ? `saved ${savedWhen}` : '',
       title: hotSaved.word,
-      definition: hotSaved.definition || hotSaved.short,
-      example: hotSaved.example,
+      definition: safeStr(hotSaved.definition || hotSaved.short),
+      example: safeStr(hotSaved.example),
       cta: 'Practise now · 3 sentences',
       actionType: 'practice-word',
       data: hotSaved
     });
   }
 
-  // 2. High priority due word
-  const topDue = dueWords[0];
+  // 2. Most overdue due word (smallest nextReviewDate)
+  const topDue = dueWords.reduce(
+    (best, w) => (!best || (w.nextReviewDate || Infinity) < (best.nextReviewDate || Infinity) ? w : best),
+    null
+  );
   if (topDue) {
+    const dueWhen = formatWhen(topDue.nextReviewDate);
     stories.push({
       id: `due-${topDue.word}`,
       label: topDue.word,
-      kind: 'Due for review',
+      kind: dueWords.length > 1 ? `Due for review · ${dueWords.length} words` : 'Due for review',
+      when: dueWhen ? `due ${dueWhen}` : '',
       title: topDue.word,
-      definition: topDue.definition || topDue.short,
-      example: topDue.example,
+      definition: safeStr(topDue.definition || topDue.short),
+      example: safeStr(topDue.example),
       cta: 'Review due words',
       actionType: 'reviews',
       data: topDue
     });
   }
 
-  // 3. Vault slip
+  // 3. Vault slip (vault is ordered newest first)
   const openSlip = vaultSlips.find(m => !m.isRedeemed && !m.fixed);
   if (openSlip) {
+    const slipWhen = formatWhen(openSlip.timestamp);
     stories.push({
       id: `slip-${openSlip.id || openSlip.word}`,
       label: 'Your slip',
       avatar: '!',
       kind: 'From your Mistake Vault',
+      when: slipWhen ? `logged ${slipWhen}` : '',
       title: openSlip.word || 'Past slip',
       slip: {
-        orig: openSlip.orig || openSlip.originalSentence || openSlip.sentence,
-        better: openSlip.better || openSlip.correctedSentence || openSlip.fix
+        orig: safeStr(openSlip.originalSentence || openSlip.orig || openSlip.sentence),
+        better: safeStr(openSlip.reframedSentence || openSlip.better || openSlip.correctedSentence || openSlip.fix),
+        rule: safeStr(openSlip.ruleOfThumb)
       },
       cta: 'Fix it',
       actionType: 'fix-slip',
@@ -85,16 +102,18 @@ export function Stories({
     });
   }
 
-  // 4. Anthology sentence
+  // 4. Anthology sentence (newest first)
   const topAnth = anthologySentences[0];
   if (topAnth) {
+    const anthWhen = formatWhen(topAnth.timestamp);
     stories.push({
       id: `craft-${topAnth.id || topAnth.word}`,
       label: 'Crafted',
       avatar: '✓',
       kind: 'From your Anthology',
+      when: anthWhen ? `saved ${anthWhen}` : '',
       title: topAnth.word || 'Anthology',
-      example: topAnth.sentence || topAnth.text,
+      example: safeStr(topAnth.sentence || topAnth.text),
       cta: 'Open Anthology',
       actionType: 'anthology',
       data: topAnth

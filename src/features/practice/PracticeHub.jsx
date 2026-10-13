@@ -1,23 +1,34 @@
 import React, { useState, useMemo } from 'react';
-import { m, AnimatePresence } from 'framer-motion';
-import { useData, useStats, useVault, useAnthology } from '../../data/DataProvider';
+import { m } from 'framer-motion';
+import { useStats, useVault, useAnthology } from '../../data/DataProvider';
 import { useNav } from '../../app/NavStack';
 import Button from '../../ui/Button';
 import { showToast } from '../../ui/Toast';
 import { triggerHaptic } from '../../motion/haptics';
-import { springs } from '../../motion/springs';
 import { DrillPage } from './DrillPage';
 import { VaultPage } from './VaultPage';
 import { AnthologyPage } from './AnthologyPage';
 import { useLayout } from '../../motion/useLayout';
 import { useTabActivation } from '../../motion/useTabActivation';
+import { calcCraftLevel } from '../../services/db';
+import { PILLAR_KEYS, PILLARS, getRecommendedPillar, getTierUnlockStatus, hasPillarTaggedSlips, pillarOfMistake } from './craft';
 
 const SKILLS = [
-  { name: 'Grammar', level: 2, pct: 55, desc: 'Keep actions and timing in sync.' },
-  { name: 'Flow', level: 1, pct: 40, desc: 'Let thoughts glide clause to clause.' },
-  { name: 'Context', level: 1, pct: 30, desc: 'Put words where they feel at home.' },
-  { name: 'Punctuation', level: 1, pct: 15, desc: 'Commas as breath marks.' }
+  { key: 'grammar', name: 'Grammar', desc: 'Keep actions and timing in sync.' },
+  { key: 'flow', name: 'Flow', desc: 'Let thoughts glide clause to clause.' },
+  { key: 'context', name: 'Context', desc: 'Put words where they feel at home.' },
+  { key: 'punctuation', name: 'Punctuation', desc: 'Commas as breath marks.' }
 ];
+
+/** Studio.jsx ring progress: share of the current level bracket, min 6% so the bar stays visible. */
+function skillProgress(pillarStats) {
+  const xp = pillarStats?.xp || 0;
+  const lvl = calcCraftLevel(xp, pillarStats?.tierCompletions);
+  const span = lvl.nextThreshold - lvl.currentBase;
+  const progress = Math.max(0, xp - lvl.currentBase);
+  const pct = lvl.level >= 5 || lvl.isCapped ? 1 : Math.min(1, Math.max(0.06, span > 0 ? progress / span : 1));
+  return { level: lvl.level, isCapped: lvl.isCapped, pct: Math.round(pct * 100) };
+}
 
 const TIER_NAMES = ['Spot & fix', 'Polish', 'Vault rehab', 'Craft'];
 const TIER_SUBS = [
@@ -30,8 +41,8 @@ const TIER_SUBS = [
 export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
   const { activationKey } = useTabActivation(isActive);
   const { push } = useNav();
-  const { stats, craftLevelInfo } = useStats();
-  const { openMistakes = [] } = useVault();
+  const { craft = {}, totalCraftXp = 0, craftLevelInfo } = useStats();
+  const { allMistakes = [], openMistakes = [] } = useVault();
   const { anthology = [] } = useAnthology();
   const { isLaptop } = useLayout();
 
@@ -75,38 +86,25 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
   // Frosted topbar interpolation: clamp((scrollTop - 20) / 34, 0, 1)
   const topBarProgress = Math.min(1, Math.max(0, (scrollTop - 20) / 34));
 
-  const xp = stats?.xp || stats?.totalPracticed || 180;
-  const rank = craftLevelInfo?.rank || 'Craftsman';
+  // Header: total craft XP across the four pillars (Studio's "Craft XP")
+  const xp = totalCraftXp;
+  const rank = craftLevelInfo?.rank || 'Apprentice';
 
-  // Completed tier counts for selected skill
-  const skillKey = SKILLS[selectedSkill]?.name.toLowerCase();
-  const pillarStats = stats?.[skillKey] || {};
-  const completedTiers = useMemo(() => {
-    const raw = pillarStats.tierCompletions || {};
-    return [raw[1] || 0, raw[2] || 0, raw[3] || 0, raw[4] || 0];
-  }, [pillarStats]);
+  const skillKey = SKILLS[selectedSkill]?.key;
+  const skillProgressList = useMemo(() => SKILLS.map(s => skillProgress(craft?.[s.key])), [craft]);
 
-  // Unlocked status for tiers
-  const unlocked = useMemo(() => {
-    const d = completedTiers;
-    const total = d[0] + d[1] + d[2];
-    return [
-      true, // Tier 1 always unlocked
-      d[0] >= 3 || total >= 3,
-      d[1] >= 3 || openMistakes.length > 0 || total >= 6,
-      d[2] >= 2 || total >= 8
-    ];
-  }, [completedTiers, openMistakes.length]);
+  // Studio.jsx tierUnlockStatus (v1 math: per-pillar solved count + ALL vault mistakes)
+  const tierStatus = useMemo(
+    () => getTierUnlockStatus(craft?.[skillKey], allMistakes),
+    [craft, skillKey, allMistakes]
+  );
+  const unlocked = [1, 2, 3, 4].map(t => !!tierStatus[t]?.unlocked);
+  const getLockReason = (tierIdx) => tierStatus[tierIdx + 1]?.reason || '';
 
-  const getLockReason = (tierIdx) => {
-    const d = completedTiers;
-    return [
-      '',
-      `Finish ${Math.max(0, 3 - d[0])} more Spot & fix drills to unlock Polish.`,
-      `Finish ${Math.max(0, 3 - d[1])} more Polish drills to unlock Vault rehab.`,
-      `Finish ${Math.max(0, 2 - d[2])} more Vault rehab drills to unlock Craft.`
-    ][tierIdx];
-  };
+  // Daily Tune-Up: Studio.jsx recommendedPillar from vault error tags
+  const recommendedPillar = useMemo(() => getRecommendedPillar(allMistakes), [allMistakes]);
+  const recommendedIdx = Math.max(0, PILLAR_KEYS.indexOf(recommendedPillar));
+  const tuneUpFromSlips = useMemo(() => hasPillarTaggedSlips(allMistakes), [allMistakes]);
 
   const handleSelectSkill = (idx) => {
     if (idx !== selectedSkill) {
@@ -115,19 +113,24 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
     }
   };
 
-  const handleStartDrill = (tierNum) => {
+  const handleStartDrill = (tierNum, skillIdx = selectedSkill) => {
     triggerHaptic('medium');
     push({
-      id: `drill-${selectedSkill}-${tierNum}`,
-      title: SKILLS[selectedSkill].name,
+      id: `drill-${skillIdx}-${tierNum}`,
+      title: SKILLS[skillIdx].name,
       component: DrillPage,
       props: {
-        skillId: selectedSkill,
-        initialTier: tierNum,
-        mistake: openMistakes[0] || null
+        skillId: skillIdx,
+        pillar: SKILLS[skillIdx].key,
+        initialTier: tierNum
       },
       hideTab: true
     });
+  };
+
+  const handleTuneUp = () => {
+    setSelectedSkill(recommendedIdx);
+    handleStartDrill(1, recommendedIdx);
   };
 
   const handleLockedClick = (tierIdx) => {
@@ -145,12 +148,14 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
       component: VaultPage,
       props: {
         onFixMistake: (m) => {
+          const pillar = pillarOfMistake(m) || SKILLS[selectedSkill].key;
           push({
             id: `drill-fix-${m.id}`,
             title: 'Drill',
             component: DrillPage,
             props: {
-              skillId: m.skill || selectedSkill,
+              skillId: PILLAR_KEYS.indexOf(pillar),
+              pillar,
               initialTier: 3,
               mistake: m
             },
@@ -279,13 +284,15 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
           aria-label="Daily tune-up"
           style={{ marginTop: '12px' }}
         >
-          <span className="lab">Daily tune-up · picked from your slips</span>
-          <h2>Grammar: keep past and present in sync</h2>
-          <p>Short drills · about 3 minutes · also part of today's session</p>
+          <span className="lab">
+            {tuneUpFromSlips ? 'Daily tune-up · picked from your slips' : 'Daily tune-up'}
+          </span>
+          <h2>Focus on {PILLARS[recommendedPillar].fullTitle}</h2>
+          <p>{PILLARS[recommendedPillar].corePrinciple}</p>
           <Button
             variant="primary"
             size="sm"
-            onClick={() => handleStartDrill(1)}
+            onClick={handleTuneUp}
             style={{
               alignSelf: 'flex-start',
               width: 'auto',
@@ -335,6 +342,7 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
           )}
           {SKILLS.map((s, i) => {
             const isSelected = selectedSkill === i;
+            const prog = skillProgressList[i];
             return (
               <button
                 key={s.name}
@@ -350,13 +358,13 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
               >
                 <div className="r1">
                   <b>{s.name}</b>
-                  <span className="lv">Lvl {s.level}</span>
+                  <span className="lv">Lvl {prog.level}{prog.isCapped ? ' · capped' : ''}</span>
                 </div>
                 <span className="ds">{s.desc}</span>
                 <span className="bar">
                   <i
                     style={{
-                      width: barsFilled ? `${s.pct}%` : '0%',
+                      width: barsFilled ? `${prog.pct}%` : '0%',
                       transition: 'width 0.85s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
                   />
@@ -453,8 +461,8 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
             <b>Mistake Vault</b>
             <span>
               {openMistakes.length > 0
-                ? `${openMistakes.length} slips to fix`
-                : 'All slips fixed'}
+                ? `${openMistakes.length} ${openMistakes.length === 1 ? 'slip' : 'slips'} to fix`
+                : allMistakes.length > 0 ? 'All slips fixed' : 'No slips yet'}
             </span>
           </button>
 
@@ -466,7 +474,7 @@ export function PracticeHub({ isActive = true, onSwitchTab = () => {} }) {
             }}
           >
             <b>Anthology</b>
-            <span>{anthology.length} saved sentences</span>
+            <span>{anthology.length} saved {anthology.length === 1 ? 'sentence' : 'sentences'}</span>
           </button>
         </div>
 

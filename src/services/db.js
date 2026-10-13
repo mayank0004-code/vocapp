@@ -184,6 +184,8 @@ export async function updateWordSRS(userId, wordId, isCorrect, currentInterval) 
     const wordRef = doc(db, 'users', userId, 'vocabulary', wordId);
     
     let newInterval = 1;
+    // A word missing its interval would otherwise compute NaN and never be due again.
+    if (!Number.isFinite(currentInterval) || currentInterval < 1) currentInterval = 1;
     if (isCorrect) {
       if (currentInterval === 1) newInterval = 3;
       else if (currentInterval === 3) newInterval = 7;
@@ -252,6 +254,20 @@ export async function getPendingWords(userId) {
     console.error("Error fetching pending words:", error);
     throw error;
   }
+}
+
+// Undo for a removed saved word: puts the doc back exactly as it was,
+// keeping its original createdAt so the 7-day expiry doesn't restart.
+export async function restorePendingWord(userId, wordData) {
+  // eslint-disable-next-line no-unused-vars
+  const { id, expiresInDays, dueLabel, isExpiringSoon, ...data } = wordData;
+  const wordRef = doc(db, 'users', userId, 'vocabulary', id || data.word.toLowerCase());
+  await setDoc(wordRef, {
+    ...data,
+    word: data.word.toLowerCase(),
+    createdAt: data.createdAt || new Date().getTime(),
+    status: 'pending'
+  }, { merge: true });
 }
 
 export function listenToPendingWords(userId, callback) {
@@ -1335,9 +1351,10 @@ export async function recordTodayProgress(userId, kind) {
       today.wordWritten = true;
     }
 
+    // Never write lastPracticedDate here: recordDailyActivity owns it, and
+    // setting it first would make the streak update skip today.
     await setDoc(statsRef, {
       today,
-      lastPracticedDate: todayStr,
       activeDates: arrayUnion(todayStr)
     }, { merge: true });
   } catch (error) {

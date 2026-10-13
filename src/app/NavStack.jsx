@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { m, AnimatePresence } from 'framer-motion';
 import { springs } from '../motion/springs';
 
@@ -6,6 +6,10 @@ const NavStackContext = createContext(null);
 
 export function NavStackProvider({ children }) {
   const [stack, setStack] = useState([]);
+  const stackRef = useRef(stack);
+  useEffect(() => {
+    stackRef.current = stack;
+  }, [stack]);
 
   // Browser back button handling
   useEffect(() => {
@@ -28,16 +32,21 @@ export function NavStackProvider({ children }) {
     setStack(prev => [...prev, page]);
   }, []);
 
+  // In-app back consumes the history entry that push() created, so the
+  // browser/OS back button stays in sync (popstate above does the slice).
   const pop = useCallback(() => {
-    setStack(prev => {
-      if (prev.length > 0) {
-        return prev.slice(0, -1);
-      }
-      return prev;
-    });
+    if (window.history.state && window.history.state.pageId !== undefined) {
+      window.history.back();
+      return;
+    }
+    setStack(prev => (prev.length > 0 ? prev.slice(0, -1) : prev));
   }, []);
 
   const popToRoot = useCallback(() => {
+    const depth = stackRef.current.length;
+    if (depth > 0 && window.history.state && window.history.state.pageId !== undefined) {
+      window.history.go(-depth);
+    }
     setStack([]);
   }, []);
 

@@ -1,40 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useEdgeBack } from '../../motion/useEdgeBack';
 import StrengthBars from '../../ui/StrengthBars';
 import Button from '../../ui/Button';
 import { showToast } from '../../ui/Toast';
-import { deleteLearnedWord, deletePendingWord, savePendingWord } from '../../services/db';
+import { deleteLearnedWord, deletePendingWord, restorePendingWord } from '../../services/db';
 import { useData } from '../../data/DataProvider';
+import { safeStr, toCollocations, toCommonMistakes, renderMistake } from './wordFormat';
+import { getWordStrength, nextReviewLabel, savedLabel, restoreLearnedWord, STRENGTH_LABELS } from './wordStatus';
 
 export function WordDetailPage({ word, onBack = () => {}, isInline = false }) {
-  const { currentUser } = useData();
+  const { currentUser, craft } = useData();
   const [isDeleting, setIsDeleting] = useState(false);
   const containerRef = useEdgeBack({ onPop: onBack, enabled: !isInline });
 
   const isSaved = word.status === 'pending';
   const headword = word.word || '';
-  const definition = word.def || word.definition || word.short || '';
-  const pos = word.pos || word.partOfSpeech || 'adjective';
-  const example = word.example || word.sentence || '';
-  const pairs = word.pairs || word.collocations || [];
-  const origin = word.origin || word.etymology || '';
-  const vibe = word.vibe || word.tone || '';
-  const trap = word.trap || word.commonMistakes || '';
-  const contextSentence = word.contextSentence || word.context || '';
-  const register = word.register || 'Neutral to formal';
-  const sentences = word.sn || [
-    word.factualSentence,
-    word.personalSentence,
-    word.questionSentence
-  ].filter(Boolean);
+  const definition = safeStr(word.definition);
+  const pos = safeStr(word.partOfSpeech || word.pos);
+  const example = safeStr(word.example);
+  const pairs = toCollocations(word.collocations);
+  const origin = safeStr(word.origin);
+  const vibe = safeStr(word.contextMeaning);
+  const traps = toCommonMistakes(word.commonMistakes);
+  const contextSentence = safeStr(word.contextSentence);
+  const register = safeStr(word.vibeCheck);
+  // Keep each sentence paired with its own label even when one is missing.
+  const sentences = [
+    { label: 'A fact', text: safeStr(word.factualSentence) },
+    { label: 'About you', text: safeStr(word.personalSentence) },
+    { label: 'A question', text: safeStr(word.questionSentence) }
+  ].filter(sn => sn.text);
 
-  const getIntervalStrength = (interval) => {
-    if (!interval || interval <= 1) return 1;
-    if (interval <= 3) return 2;
-    if (interval <= 7) return 3;
-    return 4;
-  };
-  const strength = isSaved ? 0 : getIntervalStrength(word.interval);
+  const strength = getWordStrength(word);
+  const isCrafted = useMemo(
+    () => (craft?.craftedWords || []).some(w => String(w).toLowerCase() === headword.toLowerCase()),
+    [craft, headword]
+  );
 
   const handleSpeak = () => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -50,22 +51,30 @@ export function WordDetailPage({ word, onBack = () => {}, isInline = false }) {
     if (!currentUser?.uid) return;
     try {
       if (isSaved) {
-        await deletePendingWord(currentUser.uid, headword);
+        await deletePendingWord(currentUser.uid, word.id || headword.toLowerCase());
       } else {
-        await deleteLearnedWord(currentUser.uid, headword);
+        await deleteLearnedWord(currentUser.uid, word.id || headword.toLowerCase());
       }
       onBack();
       showToast(
         `“${headword}” removed`,
         'Undo',
         async () => {
-          if (isSaved) {
-            await savePendingWord(currentUser.uid, word);
+          try {
+            if (isSaved) {
+              await restorePendingWord(currentUser.uid, word);
+            } else {
+              await restoreLearnedWord(currentUser.uid, word);
+            }
+          } catch (err) {
+            console.error('Error restoring word:', err);
+            showToast(`Couldn’t restore “${headword}”`);
           }
         }
       );
     } catch (err) {
       console.error('Error removing word:', err);
+      showToast(`Couldn’t remove “${headword}”. Try again.`);
     }
   };
 
@@ -145,7 +154,7 @@ export function WordDetailPage({ word, onBack = () => {}, isInline = false }) {
       {/* Hero Title & Pronunciation */}
       <div style={{ padding: '16px 20px 4px' }}>
         <small style={{ fontSize: '13px', color: 'var(--mute)', fontWeight: 500 }}>
-          {word.createdAt ? `Added ${new Date(word.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : 'In your words'}
+          {typeof word.createdAt === 'number' ? `Added ${new Date(word.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: new Date(word.createdAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })}` : (isSaved ? 'Saved for later' : 'In your words')}
         </small>
         <h1
           className="serif"
@@ -159,26 +168,30 @@ export function WordDetailPage({ word, onBack = () => {}, isInline = false }) {
         >
           {headword}
         </h1>
-        <span style={{ fontSize: '14.5px', color: 'var(--fg3)', display: 'block' }}>
-          {pos}
-        </span>
+        {pos && (
+          <span style={{ fontSize: '14.5px', color: 'var(--fg3)', display: 'block' }}>
+            {pos}
+          </span>
+        )}
       </div>
 
       {/* Badges */}
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', margin: '10px 20px 0' }}>
-        {word.crafted && (
+        {isCrafted && (
           <span style={{ fontSize: '12.5px', fontWeight: 600, padding: '5px 10px', borderRadius: '9px', background: 'var(--accbg)', color: 'var(--acc2)' }}>
             Crafted · used in your writing
           </span>
         )}
         {isSaved && (
           <span style={{ fontSize: '12.5px', fontWeight: 600, padding: '5px 10px', borderRadius: '9px', background: 'var(--orgbg)', color: 'var(--org2)' }}>
-            Saved for later · {word.dueLabel?.toLowerCase()}
+            Saved for later · {savedLabel(word).toLowerCase()}
           </span>
         )}
-        <span style={{ fontSize: '12.5px', fontWeight: 600, padding: '5px 10px', borderRadius: '9px', background: 'var(--card2)', color: 'var(--fg2)' }}>
-          {register}
-        </span>
+        {register && (
+          <span style={{ fontSize: '12.5px', fontWeight: 600, padding: '5px 10px', borderRadius: '9px', background: 'var(--card2)', color: 'var(--fg2)' }}>
+            {register}
+          </span>
+        )}
       </div>
 
       {/* Main Definition */}
@@ -192,10 +205,13 @@ export function WordDetailPage({ word, onBack = () => {}, isInline = false }) {
           <StrengthBars strength={strength} big={true} />
           <div>
             <b style={{ fontSize: '15px', display: 'block' }}>
-              Level {strength}
+              {STRENGTH_LABELS[strength]}
+              {typeof word.interval === 'number' && (
+                <span style={{ fontWeight: 400, color: 'var(--mute)' }}> · {word.interval}-day interval</span>
+              )}
             </b>
             <span style={{ fontSize: '13px', color: 'var(--mute)' }}>
-              Next review: {word.dueLabel || `in ${word.interval || 1}d`}
+              {nextReviewLabel(word.nextReviewDate)}
             </span>
           </div>
         </div>
@@ -217,7 +233,7 @@ export function WordDetailPage({ word, onBack = () => {}, isInline = false }) {
         {vibe && (
           <div style={{ padding: '16px', borderRadius: '18px', background: 'var(--card)' }}>
             <span style={{ fontSize: '12px', color: 'var(--mute)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Vibe check
+              In your context
             </span>
             <p style={{ fontSize: '15.5px', lineHeight: 1.5, margin: '6px 0 0', color: 'var(--fg2)' }}>
               {vibe}
@@ -271,14 +287,16 @@ export function WordDetailPage({ word, onBack = () => {}, isInline = false }) {
           </div>
         )}
 
-        {trap && (
+        {traps.length > 0 && (
           <div style={{ padding: '16px', borderRadius: '18px', background: 'var(--card)' }}>
             <span style={{ fontSize: '12px', color: 'var(--mute)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Common trap
             </span>
-            <p style={{ fontSize: '15px', lineHeight: 1.5, margin: '6px 0 0', color: 'var(--fg2)' }}>
-              {trap}
-            </p>
+            {traps.map((t, i) => (
+              <p key={i} style={{ fontSize: '15px', lineHeight: 1.5, margin: '6px 0 0', color: 'var(--fg2)' }}>
+                {renderMistake(t)}
+              </p>
+            ))}
           </div>
         )}
 
@@ -289,12 +307,12 @@ export function WordDetailPage({ word, onBack = () => {}, isInline = false }) {
             </span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
               {sentences.map((sent, i) => (
-                <div key={i} style={{ borderTop: i > 0 ? '0.5px solid var(--line)' : 'none', paddingTop: i > 0 ? '8px' : 0 }}>
+                <div key={sent.label} style={{ borderTop: i > 0 ? '0.5px solid var(--line)' : 'none', paddingTop: i > 0 ? '8px' : 0 }}>
                   <span style={{ fontSize: '12px', color: 'var(--mute)', fontWeight: 600, textTransform: 'uppercase' }}>
-                    {['A fact', 'About you', 'A question'][i] || `Sentence ${i + 1}`}
+                    {sent.label}
                   </span>
                   <p className="serif" style={{ fontSize: '17px', margin: '2px 0 0', color: 'var(--fg)' }}>
-                    “{sent}”
+                    “{sent.text}”
                   </p>
                 </div>
               ))}

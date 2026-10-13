@@ -1,52 +1,148 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useEdgeBack } from '../../motion/useEdgeBack';
-import { useData, useSettings } from '../../data/DataProvider';
+import { useData, useSettings, useStats } from '../../data/DataProvider';
+import {
+  enablePushNotifications,
+  getUserSettings,
+  resetCraftStats,
+  resetMistakeInsights,
+  getQuestionBank,
+  exportQuestionBankToExcel
+} from '../../services/db';
 import { showToast } from '../../ui/Toast';
 import { triggerHaptic } from '../../motion/haptics';
 import Button from '../../ui/Button';
 
+// Mirrors the level profiles the sentence generator uses (functions/index.js).
 const LEVELS = [
-  { n: 1, name: 'Foundations', words: '6–10 words', syntax: 'Short, simple sentences with one subject and verb.' },
-  { n: 2, name: 'Compound sentences', words: '10–18 words', syntax: 'Two balanced thoughts linked with a coordinating conjunction.' },
-  { n: 3, name: 'Complex sentences', words: '14–24 words', syntax: 'One main idea deepened by subordinate or relative clauses.' },
-  { n: 4, name: 'Rhetorical variety', words: '18–30 words', syntax: 'Participial openers, em-dashes, and varied clause lengths.' },
-  { n: 5, name: 'Stylistic mastery', words: '22–36 words', syntax: 'Inverted syntax, rhythmic cadence, and nuanced undertones.' }
+  { n: 1, name: 'Apprentice', words: '7–12 words', syntax: 'Direct subject–verb–object sentences without nested clauses.' },
+  { n: 2, name: 'Craftsman', words: '10–16 words', syntax: 'Compound sentences with one common connector (and, but, so, because).' },
+  { n: 3, name: 'Wordsmith', words: '13–20 words', syntax: 'Multi-clause sentences with varied transitions and moderate nuance.' },
+  { n: 4, name: 'Stylist', words: '16–24 words', syntax: 'Complex rhetorical structure, varied cadence, subtle tone.' },
+  { n: 5, name: 'Master', words: '18–30 words', syntax: 'Periodic clauses, rhythmic elegance, literary prose.' }
 ];
 
+// Same targets as classic Settings → Studio Progress.
 const RESET_OPTIONS = [
-  'Grammar XP',
-  'Flow XP',
-  'Context XP',
-  'Punctuation XP',
-  'All Practice progress',
-  'Habits and slip history'
+  { label: 'Grammar XP', target: 'grammar' },
+  { label: 'Flow XP', target: 'flow' },
+  { label: 'Context XP', target: 'context' },
+  { label: 'Punctuation XP', target: 'punctuation' },
+  { label: 'All Practice XP', target: 'all' },
+  { label: 'Habits and mistake counts', target: 'insights' }
 ];
+
+const QUESTION_BANK_LIMIT = 500;
+
+const clampLevel = (lvl) => Math.min(5, Math.max(1, parseInt(lvl, 10) || 1));
+
+const formatHour = (h) => {
+  const hour = ((h % 24) + 24) % 24;
+  const suffix = hour < 12 ? 'am' : 'pm';
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12} ${suffix}`;
+};
+
+// Same peak-hour pick as the reminder scheduler (functions/index.js).
+const peakActivityHour = (activityHours) => {
+  if (!activityHours || typeof activityHours !== 'object') return null;
+  let best = null;
+  let bestCount = 0;
+  for (const [hour, count] of Object.entries(activityHours)) {
+    if (typeof count === 'number' && count > bestCount) {
+      bestCount = count;
+      best = parseInt(hour, 10);
+    }
+  }
+  return Number.isFinite(best) ? best : null;
+};
+
+const QUESTION_TYPE_LABELS = {
+  flashcard: 'Flashcard',
+  'fill-in-the-blank': 'Fill in the blank'
+};
 
 export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
   const containerRef = useEdgeBack({ onPop: onBack, enabled: true });
   const { currentUser } = useData();
   const { settings, updateSettings } = useSettings();
+  const { stats } = useStats();
 
-  const [pushReminders, setPushReminders] = useState(settings?.notificationsEnabled ?? false);
-  const [timingMode, setTimingMode] = useState(settings?.timingMode ?? 'smart');
-  const [customTime, setCustomTime] = useState(settings?.customTime ?? '18:00');
-  const [autoAdjust, setAutoAdjust] = useState(settings?.autoAdjustLevel ?? true);
-  const [level, setLevel] = useState(settings?.englishLevel ?? 2);
+  const [pushReminders, setPushReminders] = useState(!!settings?.notificationsEnabled);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState('');
+  const [timingMode, setTimingMode] = useState(settings?.timingMode || 'smart');
+  const [customTime, setCustomTime] = useState(settings?.customTime || '18:00');
+  const [autoAdjust, setAutoAdjust] = useState(settings?.autoAdjustLevel !== false);
+  const [level, setLevel] = useState(clampLevel(settings?.englishLevel));
 
+  const [questions, setQuestions] = useState([]);
+  const [questionsLoading, setQuestionsLoading] = useState(!!currentUser?.uid);
+  const [exporting, setExporting] = useState(false);
   const [downloadMsg, setDownloadMsg] = useState(null);
   const [activeResetDrawer, setActiveResetDrawer] = useState(null);
+  const [resetBusy, setResetBusy] = useState(false);
   const [resetsDone, setResetsDone] = useState(new Set());
   const [isSignOutArmed, setIsSignOutArmed] = useState(false);
 
-  const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Dev';
-  const initial = (displayName[0] || 'D').toUpperCase();
+  const uid = currentUser?.uid;
+  const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Your account';
+  const initial = (displayName[0] || '?').toUpperCase();
 
-  const handleTogglePush = () => {
-    const next = !pushReminders;
-    setPushReminders(next);
+  // Re-read settings from Firestore on open: auto-adjust can change
+  // englishLevel during reviews after the app loaded them.
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    getUserSettings(uid).then((data) => {
+      if (cancelled || !data) return;
+      setPushReminders(!!data.notificationsEnabled);
+      setTimingMode(data.timingMode || 'smart');
+      setCustomTime(data.customTime || '18:00');
+      setAutoAdjust(data.autoAdjustLevel !== false);
+      setLevel(clampLevel(data.englishLevel));
+    }).catch(console.error);
+    return () => { cancelled = true; };
+  }, [uid]);
+
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    getQuestionBank(uid, QUESTION_BANK_LIMIT).then((list) => {
+      if (!cancelled) setQuestions(list || []);
+    }).finally(() => {
+      if (!cancelled) setQuestionsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [uid]);
+
+  const notifySettingsChanged = () => {
+    window.dispatchEvent(new CustomEvent('vocapp:settings-updated'));
+  };
+
+  const peakHour = peakActivityHour(stats?.activityHours);
+
+  const handleTogglePush = async () => {
+    if (pushBusy || !uid) return;
     triggerHaptic('light');
-    updateSettings({ notificationsEnabled: next });
-    showToast(next ? 'Daily practice reminders enabled' : 'Reminders disabled');
+    setPushError('');
+    if (pushReminders) {
+      setPushReminders(false);
+      await updateSettings({ notificationsEnabled: false });
+      showToast('Reminders turned off');
+      return;
+    }
+    // Same flow as classic: ask for permission and register the FCM token.
+    setPushBusy(true);
+    const token = await enablePushNotifications(uid);
+    setPushBusy(false);
+    if (token) {
+      setPushReminders(true);
+      await updateSettings({ notificationsEnabled: true });
+      showToast('Daily practice reminders on');
+    } else {
+      setPushError('Permission denied or notifications aren’t supported in this browser. On iOS, add Vocapp to your Home Screen first.');
+    }
   };
 
   const handleTimingChange = (mode) => {
@@ -57,6 +153,7 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
   };
 
   const handleTimeInput = (val) => {
+    if (!val) return;
     setCustomTime(val);
     updateSettings({ customTime: val });
     showToast(`Reminder set for ${val}`);
@@ -66,28 +163,54 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
     const next = !autoAdjust;
     setAutoAdjust(next);
     triggerHaptic('light');
-    updateSettings({ autoAdjustLevel: next });
+    Promise.resolve(updateSettings({ autoAdjustLevel: next })).then(notifySettingsChanged);
+    showToast(next ? 'Auto-adjust on' : `Locked to L${level}`);
   };
 
   const handleSelectLevel = (n) => {
     setLevel(n);
     triggerHaptic('light');
-    updateSettings({ englishLevel: n });
-    showToast(`Level set to L${n}`);
+    Promise.resolve(updateSettings({ englishLevel: n })).then(notifySettingsChanged);
+    showToast(`Level set to L${n} · ${LEVELS.find(l => l.n === n)?.name}`);
   };
 
-  const handleExport = (format) => {
+  const handleExport = async (format) => {
+    if (!uid || exporting) return;
     triggerHaptic('medium');
-    setDownloadMsg(`vocapp-questions.${format} downloaded`);
-    setTimeout(() => setDownloadMsg(null), 4000);
+    setExporting(true);
+    try {
+      const res = await exportQuestionBankToExcel(uid, format);
+      setDownloadMsg(`${res.count} questions saved as ${res.filename}`);
+      setTimeout(() => setDownloadMsg(null), 4000);
+    } catch (err) {
+      showToast(err?.message || 'Export failed');
+    } finally {
+      setExporting(false);
+    }
   };
 
-  const handleConfirmReset = (name) => {
-    setResetsDone(prev => new Set(prev).add(name));
-    setActiveResetDrawer(null);
-    triggerHaptic('error');
-    showToast(`Reset ${name}`);
+  const handleConfirmReset = async (option) => {
+    if (!uid || resetBusy) return;
+    setResetBusy(true);
+    try {
+      if (option.target === 'insights') {
+        await resetMistakeInsights(uid);
+      } else {
+        await resetCraftStats(uid, option.target);
+      }
+      setResetsDone(prev => new Set(prev).add(option.label));
+      setActiveResetDrawer(null);
+      triggerHaptic('error');
+      showToast(`${option.label} reset`);
+    } catch (err) {
+      console.error('Reset failed:', err);
+      showToast('Couldn’t reset. Please try again.');
+    } finally {
+      setResetBusy(false);
+    }
   };
+
+  const questionCount = questions.length >= QUESTION_BANK_LIMIT ? `${QUESTION_BANK_LIMIT}+` : String(questions.length);
 
   return (
     <div
@@ -189,7 +312,7 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
               </span>
               <div className="tx">
                 <b style={{ fontSize: '17px' }}>{displayName}</b>
-                <small>{currentUser?.email || 'Signed in with Google'}</small>
+                {currentUser?.email && <small>{currentUser.email}</small>}
               </div>
             </div>
           </div>
@@ -209,9 +332,16 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
                 role="switch"
                 aria-checked={pushReminders}
                 aria-label="Daily practice reminders"
+                aria-busy={pushBusy}
+                disabled={pushBusy}
                 onClick={handleTogglePush}
               />
             </div>
+            {pushError && (
+              <p className="note fadein" style={{ margin: '4px 0 0', color: 'var(--bad)' }}>
+                {pushError}
+              </p>
+            )}
 
             <div
               className="col"
@@ -241,7 +371,10 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
 
               {timingMode === 'smart' ? (
                 <p className="note fadein" style={{ margin: '4px 0 0' }}>
-                  We remind you at the hour you usually practise. Right now that's around 6 pm.
+                  We remind you at the hour you usually practise.{' '}
+                  {peakHour !== null
+                    ? `Right now that's around ${formatHour(peakHour)}.`
+                    : 'Until we learn your rhythm, that’s around 6 pm.'}
                 </p>
               ) : (
                 <label
@@ -320,7 +453,7 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
             </ul>
           </div>
           <p className="note">
-            Brand-new words always start with short, simple sentences, whatever your level, so you learn the meaning first.
+            Sets the sentence length and complexity of your Practice drills.
           </p>
         </div>
 
@@ -330,7 +463,7 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
           <div className="set">
             <div>
               <span>Questions stored</span>
-              <b className="num">214</b>
+              <b className="num">{questionsLoading ? '…' : questionCount}</b>
             </div>
             <div className="col" style={{ gap: '10px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -338,6 +471,7 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
                   size="sm"
                   variant="ghost"
                   onClick={() => handleExport('xls')}
+                  disabled={exporting || questionsLoading || questions.length === 0}
                   style={{
                     flex: 1,
                     background: 'var(--card2)',
@@ -350,6 +484,7 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
                   size="sm"
                   variant="ghost"
                   onClick={() => handleExport('csv')}
+                  disabled={exporting || questionsLoading || questions.length === 0}
                   style={{
                     flex: 1,
                     background: 'var(--card2)',
@@ -371,27 +506,29 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
             </div>
           </div>
 
-          <div className="set rq" style={{ marginTop: '10px' }}>
-            <div>
-              <em>perplexed</em>
-              <span>Flashcard · Correct</span>
+          {questions.length > 0 ? (
+            <div className="set rq" style={{ marginTop: '10px' }}>
+              {questions.slice(0, 3).map((q, i) => (
+                <div key={q.id || i}>
+                  <em>{q.word}</em>
+                  <span>
+                    {QUESTION_TYPE_LABELS[q.type] || q.domainName || q.type || 'Question'}
+                    {q.result ? ` · ${q.result === 'correct' ? 'Correct' : 'Missed'}` : ''}
+                  </span>
+                </div>
+              ))}
             </div>
-            <div>
-              <em>equivocal</em>
-              <span>Flashcard · Missed</span>
-            </div>
-            <div>
-              <em>provenance</em>
-              <span>Flashcard · Missed</span>
-            </div>
-          </div>
+          ) : (!questionsLoading && (
+            <p className="note">Questions appear here as you complete reviews.</p>
+          ))}
         </div>
 
         {/* Reset Progress Group */}
         <div className="sgroup">
           <span className="lab">Reset progress</span>
           <div className="set rs">
-            {RESET_OPTIONS.map((item) => {
+            {RESET_OPTIONS.map((option) => {
+              const item = option.label;
               const isDone = resetsDone.has(item);
               const isOpen = activeResetDrawer === item;
 
@@ -428,10 +565,11 @@ export function SettingsPage({ onBack = () => {}, onSignOut = () => {} }) {
                         <Button
                           size="sm"
                           variant="danger"
-                          onClick={() => handleConfirmReset(item)}
+                          onClick={() => handleConfirmReset(option)}
+                          disabled={resetBusy}
                           style={{ flex: 1 }}
                         >
-                          Reset
+                          {resetBusy ? 'Resetting…' : 'Reset'}
                         </Button>
                       </div>
                     </div>

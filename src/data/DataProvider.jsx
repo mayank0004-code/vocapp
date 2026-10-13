@@ -28,7 +28,7 @@ export function DataProvider({ currentUser, children }) {
     notificationsEnabled: false,
     timingMode: 'smart',
     customTime: '18:00',
-    englishLevel: 2,
+    englishLevel: 1,
     autoAdjustLevel: true
   });
   const [loading, setLoading] = useState(true);

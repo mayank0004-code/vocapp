@@ -4,6 +4,7 @@ import { useAnthology, useData } from '../../data/DataProvider';
 import { deleteFromAnthology, saveToAnthology } from '../../services/db';
 import { showToast } from '../../ui/Toast';
 import { triggerHaptic } from '../../motion/haptics';
+import { PILLARS, normalizePillar } from './craft';
 
 export function AnthologyPage({ onBack }) {
   const containerRef = useEdgeBack({ onPop: onBack, enabled: true });
@@ -43,12 +44,18 @@ export function AnthologyPage({ onBack }) {
             next.delete(itemKey);
             return next;
           });
-          await saveToAnthology(currentUser.uid, {
-            sentence: item.sentence || item.text,
-            word: item.word,
-            pillar: item.pillar || item.skill
-          });
-          triggerHaptic('light');
+          // Firestore rejects undefined fields, so every field gets a defined value.
+          try {
+            await saveToAnthology(currentUser.uid, {
+              sentence: item.sentence || item.text || '',
+              word: item.word || '',
+              pillar: normalizePillar(item.pillar || item.skill) || item.pillar || item.skill || ''
+            });
+            triggerHaptic('light');
+          } catch (err) {
+            console.error('Failed to restore anthology sentence:', err);
+            showToast('Could not restore the sentence.');
+          }
         }
       );
     } catch (e) {
@@ -129,7 +136,7 @@ export function AnthologyPage({ onBack }) {
           Anthology
         </h1>
         <p style={{ margin: '0 0 20px', fontSize: '15px', color: 'var(--fg3)', lineHeight: 1.45 }}>
-          Sentences you were proud of, saved from Craft drills. {visibleList.length} saved.
+          Sentences you were proud of, saved from your drills. {visibleList.length} saved.
         </p>
 
         {/* Sentences List */}
@@ -146,12 +153,15 @@ export function AnthologyPage({ onBack }) {
               border: '1px solid var(--line)'
             }}
           >
-            No sentences saved yet. Finish a Craft drill or look up a word to save your best sentences.
+            No sentences saved yet. Master a drill in Practice, then tap “+ Anthology” to keep the sentence here.
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {visibleList.map((item, idx) => {
               const sentenceText = item.sentence || item.text || '';
+              const rawPillar = item.pillar || item.skill;
+              const pillarKey = normalizePillar(rawPillar);
+              const pillarLabel = pillarKey ? PILLARS[pillarKey].label : (rawPillar || '');
               return (
                 <div
                   key={item.id || idx}
@@ -172,9 +182,9 @@ export function AnthologyPage({ onBack }) {
                         className="serif"
                         style={{ fontSize: '24px', fontWeight: 500, fontStyle: 'italic', color: 'var(--fg)' }}
                       >
-                        {item.word || 'Craft'}
+                        {item.word || 'Saved sentence'}
                       </span>
-                      {item.pillar && (
+                      {pillarLabel && (
                         <span
                           style={{
                             fontSize: '11.5px',
@@ -186,7 +196,7 @@ export function AnthologyPage({ onBack }) {
                             textTransform: 'uppercase'
                           }}
                         >
-                          {item.pillar}
+                          {pillarLabel}
                         </span>
                       )}
                     </div>

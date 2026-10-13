@@ -199,7 +199,9 @@ export function StoriesViewer({
               </div>
               <div>
                 <b style={{ fontSize: '15px', color: '#FFFFFF', display: 'block' }}>{currentStory.label}</b>
-                <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>today</span>
+                {currentStory.when && (
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>{currentStory.when}</span>
+                )}
               </div>
             </div>
             <button
@@ -281,14 +283,27 @@ export function StoriesViewer({
             )}
             {currentStory.slip && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>You wrote:</p>
-                <div style={{ color: 'var(--org2)', fontFamily: 'var(--serif)', fontSize: '18px' }}>
-                  ✗ {currentStory.slip.orig}
-                </div>
-                <p style={{ margin: '8px 0 0', fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>Better version:</p>
-                <div style={{ color: 'var(--acc3)', fontFamily: 'var(--serif)', fontSize: '18px' }}>
-                  ✓ {currentStory.slip.better}
-                </div>
+                {currentStory.slip.orig && (
+                  <>
+                    <p style={{ margin: 0, fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>You wrote:</p>
+                    <div style={{ color: 'var(--org2)', fontFamily: 'var(--serif)', fontSize: '18px' }}>
+                      ✗ {currentStory.slip.orig}
+                    </div>
+                  </>
+                )}
+                {currentStory.slip.better && (
+                  <>
+                    <p style={{ margin: '8px 0 0', fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>Better version:</p>
+                    <div style={{ color: 'var(--acc3)', fontFamily: 'var(--serif)', fontSize: '18px' }}>
+                      ✓ {currentStory.slip.better}
+                    </div>
+                  </>
+                )}
+                {currentStory.slip.rule && (
+                  <p style={{ margin: '12px 0 0', fontSize: '14.5px', lineHeight: 1.45, color: 'var(--fg2)' }}>
+                    {currentStory.slip.rule}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -298,7 +313,7 @@ export function StoriesViewer({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onAction(currentStory);
+                onAction(currentStory.actionType, currentStory.data);
                 onClose();
               }}
               style={{

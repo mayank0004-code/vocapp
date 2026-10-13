@@ -4,23 +4,32 @@ import Button from '../../ui/Button';
 import { showToast } from '../../ui/Toast';
 import { triggerHaptic } from '../../motion/haptics';
 import { fetchWordBreakdown } from '../../services/ai';
-import { savePendingWord, deletePendingWord, checkWordExists } from '../../services/db';
-import { useData, useWords } from '../../data/DataProvider';
+import { savePendingWord, checkWordExists } from '../../services/db';
+import { useData } from '../../data/DataProvider';
+import { safeStr, toCollocations, toCommonMistakes, renderMistake } from '../words/wordFormat';
+
+const sectionLabel = {
+  fontSize: '12px',
+  fontWeight: 600,
+  color: 'var(--fg3)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  display: 'block',
+  marginBottom: '6px'
+};
 
 export function Capture({
   onPractice = () => {},
   onOpenInWords = () => {}
 }) {
   const { currentUser } = useData();
-  const { allWords, savedWords } = useWords();
 
   const [inputWord, setInputWord] = useState('');
   const [contextInput, setContextInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [shake, setShake] = useState(false);
+  const [searchMsg, setSearchMsg] = useState(null); // { type: 'error' | 'info', text }
   const [sheetOpen, setSheetOpen] = useState(false);
   const [wordData, setWordData] = useState(null);
-  const [typedWord, setTypedWord] = useState('');
   const [speaking, setSpeaking] = useState(false);
 
   const handleSpeak = (text) => {
@@ -36,110 +45,80 @@ export function Capture({
     }
   };
 
+  // Same flow as the classic Today page lookup.
   const handleLookup = async () => {
-    const raw = inputWord.trim().toLowerCase();
-    if (!raw) {
-      setShake(true);
-      triggerHaptic('error');
-      setTimeout(() => setShake(false), 500);
-      return;
-    }
-
+    if (!inputWord.trim() || loading || !currentUser?.uid) return;
     setLoading(true);
-    setTypedWord(raw);
+    setWordData(null);
+    setSearchMsg(null);
     setSheetOpen(true);
     triggerHaptic('light');
-
     try {
-      // 1. Try Firebase callable AI function
-      const data = await fetchWordBreakdown(raw, contextInput.trim());
-      if (data && data.word) {
-        setWordData(data);
-      } else {
-        throw new Error('Invalid breakdown');
+      const typed = inputWord.trim();
+      const exists = await checkWordExists(currentUser.uid, typed);
+      if (exists) {
+        setSheetOpen(false);
+        setSearchMsg({ type: 'error', text: `"${typed}" is already in your Dictionary.` });
+        return;
       }
-    } catch (err) {
-      console.warn('AI lookup fallback:', err);
-      // Fallback lexicographical definition (handles "albiet" -> "albeit")
-      const isAlbeit = raw === 'albiet' || raw === 'albeit';
-      const head = isAlbeit ? 'albeit' : raw;
-
-      // Check if already in user's dictionary
-      const existing = allWords.find(w => w.word.toLowerCase() === head);
-      const existingSaved = savedWords.find(w => w.word.toLowerCase() === head);
-
-      setWordData({
-        word: head,
-        definition: isAlbeit
-          ? 'Though; even though. Used to introduce a concessive clause that tempers or limits a statement without contradicting it.'
-          : (existing?.definition || 'An expressive vocabulary term captured from your reading.'),
-        partOfSpeech: isAlbeit ? 'conjunction' : (existing?.partOfSpeech || 'noun'),
-        phonetic: isAlbeit ? '/ɔːlˈbiː.ɪt/' : (existing?.phonetic || ''),
-        vibe: isAlbeit ? 'Sophisticated, measured, balanced' : 'Literary, evocative',
-        register: isAlbeit ? 'Formal and literary' : 'Formal',
-        etymology: isAlbeit ? 'Middle English: literally "all be it" (although it be that)' : 'Historical literary English',
-        collocations: isAlbeit ? ['albeit briefly', 'albeit slowly', 'albeit reluctantly', 'albeit with hesitation'] : [],
-        example: isAlbeit ? 'The reforms worked, albeit slowly.' : (contextInput || `An example showing the application of ${head}.`),
-        literature: isAlbeit ? 'He had a great, albeit unstated, influence upon contemporary thought.' : '',
-        trap: isAlbeit ? 'Do not follow with a full clause with its own verb; use it to introduce adjectives, adverbs, or phrases.' : '',
-        contextSentence: contextInput.trim(),
-        isExisting: !!existing,
-        isSaved: !!existingSaved,
-        savedItem: existingSaved,
-        existingItem: existing
-      });
+      const data = await fetchWordBreakdown(typed, contextInput.trim());
+      if (!data?.isValid) {
+        setSheetOpen(false);
+        setSearchMsg({ type: 'error', text: `"${typed}" doesn't seem to be a valid English word.` });
+        return;
+      }
+      if (data.word.toLowerCase() !== typed.toLowerCase()) {
+        const correctedExists = await checkWordExists(currentUser.uid, data.word);
+        if (correctedExists) {
+          setSheetOpen(false);
+          setSearchMsg({ type: 'error', text: `Corrected to "${data.word}", which is already in your Dictionary.` });
+          return;
+        }
+        setSearchMsg({ type: 'info', text: `Spelling corrected to "${data.word}".` });
+        setInputWord(data.word);
+      }
+      setWordData(data);
+    } catch {
+      setSheetOpen(false);
+      setSearchMsg({ type: 'error', text: 'Failed to look up word. Please try again.' });
     } finally {
       setLoading(false);
     }
   };
 
+  const resetCapture = () => {
+    setSheetOpen(false);
+    setWordData(null);
+    setInputWord('');
+    setContextInput('');
+  };
+
   const handleSaveForLater = async () => {
     if (!wordData || !currentUser?.uid) return;
     try {
-      await savePendingWord(currentUser.uid, {
-        word: wordData.word,
-        definition: wordData.definition,
-        partOfSpeech: wordData.partOfSpeech || 'adjective',
-        contextSentence: contextInput.trim(),
-        example: wordData.example,
-        createdAt: Date.now()
-      });
-      setSheetOpen(false);
+      await savePendingWord(currentUser.uid, wordData);
+      const saved = wordData.word;
+      resetCapture();
+      setSearchMsg({ type: 'info', text: `"${saved}" saved for later.` });
       triggerHaptic('success');
-      showToast(<span>Saved <em className="serif">{wordData.word}</em> for 7 days</span>);
-    } catch (e) {
-      console.error('Failed to save for later:', e);
+      showToast(<span>Saved <em className="serif">{saved}</em> for 7 days</span>);
+    } catch {
+      setSearchMsg({ type: 'error', text: 'Failed to save.' });
     }
   };
 
-  const handleRemoveFromSaved = async () => {
-    if (!wordData || !currentUser?.uid) return;
-    try {
-      await deletePendingWord(currentUser.uid, wordData.word);
-      setSheetOpen(false);
-      triggerHaptic('medium');
-      showToast(<span>Removed <em className="serif">{wordData.word}</em> from saved</span>);
-    } catch (e) {
-      console.error('Failed to remove saved word:', e);
-    }
+  const handlePracticeNow = () => {
+    const data = wordData;
+    resetCapture();
+    onPractice(data);
   };
 
-  // Determine tag status of current wordData
-  const isCorrected = wordData && typedWord && wordData.word.toLowerCase() !== typedWord.toLowerCase();
-  const existingLearned = wordData && allWords.find(w => w.word.toLowerCase() === wordData.word.toLowerCase());
-  const existingSaved = wordData && savedWords.find(w => w.word.toLowerCase() === wordData.word.toLowerCase());
-
-  const statusLabel = existingLearned
-    ? `In your words · next review ${existingLearned.dueLabel || 'soon'}`
-    : existingSaved
-    ? `Saved for later · expires in ${existingSaved.expiresInDays || 7}d`
-    : 'New word';
-
-  const statusColor = existingLearned
-    ? 'var(--fg3)'
-    : existingSaved
-    ? 'var(--org2)'
-    : 'var(--acc)';
+  const collocations = toCollocations(wordData?.collocations);
+  const commonMistakes = toCommonMistakes(wordData?.commonMistakes);
+  const contextMeaning = safeStr(wordData?.contextMeaning);
+  const vibeCheck = safeStr(wordData?.vibeCheck);
+  const origin = safeStr(wordData?.origin);
+  const example = safeStr(wordData?.example);
 
   return (
     <>
@@ -167,10 +146,10 @@ export function Capture({
         {/* Word Input */}
         <input
           id="capIn"
-          className={`inp ${shake ? 'shake' : ''}`}
+          className="inp"
           placeholder="Type or paste a word"
           value={inputWord}
-          onChange={(e) => setInputWord(e.target.value)}
+          onChange={(e) => { setInputWord(e.target.value); if (searchMsg) setSearchMsg(null); }}
           onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
           autoComplete="off"
           spellCheck="false"
@@ -214,7 +193,7 @@ export function Capture({
         <Button
           variant="secondary"
           onClick={handleLookup}
-          disabled={loading}
+          disabled={loading || !inputWord.trim()}
           style={{
             height: '44px',
             fontSize: '15px',
@@ -228,10 +207,27 @@ export function Capture({
           {loading && <span className="spin" />}
           {loading ? 'Looking it up' : 'Look it up'}
         </Button>
+
+        {searchMsg && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              padding: '10px 14px',
+              borderRadius: '12px',
+              fontSize: '14px',
+              lineHeight: 1.4,
+              background: searchMsg.type === 'error' ? 'var(--badbg)' : 'var(--accbg)',
+              color: searchMsg.type === 'error' ? 'var(--bad)' : 'var(--acc2)'
+            }}
+          >
+            {searchMsg.text}
+          </div>
+        )}
       </section>
 
       {/* Breakdown Sheet */}
-      <Sheet isOpen={sheetOpen} onClose={() => setSheetOpen(false)}>
+      <Sheet isOpen={sheetOpen} onClose={() => { setSheetOpen(false); setWordData(null); }}>
         {loading || !wordData ? (
           /* Shimmer Skeleton */
           <div
@@ -252,18 +248,11 @@ export function Capture({
           </div>
         ) : (
           <div className="sh-body sh fadein">
-            {/* Status Label */}
             <span
               className="slabel"
-              style={{
-                fontSize: '13px',
-                fontWeight: 600,
-                marginBottom: '6px',
-                display: 'block',
-                color: statusColor
-              }}
+              style={{ fontSize: '13px', fontWeight: 600, marginBottom: '6px', display: 'block', color: 'var(--acc)' }}
             >
-              {statusLabel}
+              New word
             </span>
 
             {/* Headword & Audio Button */}
@@ -315,117 +304,93 @@ export function Capture({
               </button>
             </div>
 
-            {/* Phonetic & POS */}
-            <div style={{ fontSize: '14.5px', color: 'var(--fg3)', marginBottom: '14px' }}>
-              {wordData.phonetic && <span style={{ marginRight: '8px' }}>{wordData.phonetic}</span>}
-              <span style={{ textTransform: 'lowercase' }}>{wordData.partOfSpeech}</span>
-            </div>
-
-            {/* Spelling Correction Banner */}
-            {isCorrected && (
+            {/* In your context (shown first, as in classic) */}
+            {contextMeaning && (
               <div
                 style={{
-                  margin: '4px 0 14px',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  background: 'var(--accbg)',
-                  color: 'var(--acc2)',
-                  fontSize: '14px',
-                  lineHeight: 1.4
+                  margin: '10px 0 14px',
+                  padding: '12px 14px',
+                  borderRadius: '0 14px 14px 0',
+                  borderLeft: '3px solid var(--acc)',
+                  background: 'var(--accbg)'
                 }}
-                className="banner"
               >
-                Spelling corrected from “<strong>{typedWord}</strong>” to “<strong>{wordData.word}</strong>”.
+                <span style={{ ...sectionLabel, color: 'var(--acc2)' }}>In your context</span>
+                <p style={{ margin: 0, fontSize: '15px', color: 'var(--fg2)', lineHeight: 1.45 }}>{contextMeaning}</p>
               </div>
             )}
 
             {/* Definition */}
             <p
-              style={{
-                fontSize: '19px',
-                lineHeight: 1.45,
-                margin: '8px 0 16px',
-                color: 'var(--fg)'
-              }}
+              style={{ fontSize: '19px', lineHeight: 1.45, margin: '8px 0 18px', color: 'var(--fg)' }}
               className="bigdef"
             >
-              {wordData.definition}
+              {safeStr(wordData.definition)}
             </p>
 
-            {/* In Your Sentence Context */}
-            {contextInput && (
-              <div
-                style={{
-                  margin: '12px 0',
-                  padding: '14px',
-                  borderRadius: '14px',
-                  background: 'var(--card2)',
-                  border: '1px solid var(--line)'
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    color: 'var(--acc2)',
-                    display: 'block',
-                    marginBottom: '6px'
-                  }}
-                >
-                  In your sentence
-                </span>
-                <p style={{ margin: 0, fontSize: '15px', fontStyle: 'italic', color: 'var(--fg2)', lineHeight: 1.4 }}>
-                  “{contextInput}”
-                </p>
-              </div>
-            )}
-
-            {/* Vibe Check & Register */}
-            {wordData.vibe && (
-              <div style={{ margin: '12px 0 0' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--fg3)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '4px' }}>
-                  Vibe check
-                </span>
-                <p style={{ margin: 0, fontSize: '15px', color: 'var(--fg2)' }}>{wordData.vibe}</p>
-              </div>
-            )}
-
-            {wordData.register && (
-              <div style={{ margin: '12px 0 0' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--fg3)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '4px' }}>
-                  Register
-                </span>
-                <p style={{ margin: 0, fontSize: '15px', color: 'var(--fg2)' }}>{wordData.register}</p>
-              </div>
-            )}
-
-            {/* Collocations */}
-            {wordData.collocations && wordData.collocations.length > 0 && (
-              <div style={{ margin: '14px 0 0' }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--fg3)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '8px' }}>
-                  Natural pairs
-                </span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {wordData.collocations.map((pair, idx) => (
-                    <span
-                      key={idx}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '10px',
-                        background: 'var(--card2)',
-                        border: '1px solid var(--line)',
-                        fontSize: '13.5px',
-                        color: 'var(--fg2)'
-                      }}
-                    >
-                      {pair}
-                    </span>
-                  ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {vibeCheck && (
+                <div>
+                  <span style={sectionLabel}>Register</span>
+                  <p style={{ margin: 0, fontSize: '15px', color: 'var(--fg2)', lineHeight: 1.45 }}>{vibeCheck}</p>
                 </div>
-              </div>
-            )}
+              )}
+
+              {origin && (
+                <div>
+                  <span style={sectionLabel}>Origin</span>
+                  <p style={{ margin: 0, fontSize: '15px', color: 'var(--fg2)', fontStyle: 'italic', lineHeight: 1.45 }}>{origin}</p>
+                </div>
+              )}
+
+              {collocations.length > 0 && (
+                <div>
+                  <span style={sectionLabel}>Collocations</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {collocations.map((pair, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '10px',
+                          background: 'var(--card2)',
+                          border: '1px solid var(--line)',
+                          fontSize: '13.5px',
+                          color: 'var(--fg2)'
+                        }}
+                      >
+                        {pair}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {example && (
+                <div>
+                  <span style={sectionLabel}>Example</span>
+                  <p style={{ margin: 0, fontSize: '15px', color: 'var(--fg2)', fontStyle: 'italic', paddingLeft: '10px', borderLeft: '2px solid var(--line)', lineHeight: 1.45 }}>
+                    “{example}”
+                  </p>
+                </div>
+              )}
+
+              {commonMistakes.length > 0 && (
+                <div>
+                  <span style={sectionLabel}>Common traps</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {commonMistakes.map((m, i) => (
+                      <p
+                        key={i}
+                        style={{ margin: 0, fontSize: '14px', color: 'var(--fg2)', paddingLeft: '10px', borderLeft: '2px solid var(--warn)', lineHeight: 1.5 }}
+                      >
+                        {renderMistake(m)}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Action Buttons */}
             <div
@@ -436,50 +401,12 @@ export function Capture({
                 gap: '10px'
               }}
             >
-              {!existingLearned ? (
-                <>
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    onClick={() => {
-                      setSheetOpen(false);
-                      onPractice(wordData);
-                    }}
-                  >
-                    Practise now · 3 sentences
-                  </Button>
-
-                  {existingSaved ? (
-                    <Button
-                      variant="ghost"
-                      size="md"
-                      onClick={handleRemoveFromSaved}
-                      style={{ color: 'var(--bad)' }}
-                    >
-                      Remove from saved
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      size="md"
-                      onClick={handleSaveForLater}
-                    >
-                      Save for later
-                    </Button>
-                  )}
-                </>
-              ) : (
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  onClick={() => {
-                    setSheetOpen(false);
-                    onOpenInWords(wordData);
-                  }}
-                >
-                  Open in Words
-                </Button>
-              )}
+              <Button variant="pri" onClick={handlePracticeNow}>
+                Practise now · 3 sentences
+              </Button>
+              <Button variant="grey" onClick={handleSaveForLater}>
+                Save for later
+              </Button>
             </div>
           </div>
         )}

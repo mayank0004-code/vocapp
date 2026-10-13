@@ -3,18 +3,19 @@ import { m, AnimatePresence } from 'framer-motion';
 import Button from '../../ui/Button';
 import { showToast } from '../../ui/Toast';
 import { triggerHaptic } from '../../motion/haptics';
-import { deletePendingWord, savePendingWord } from '../../services/db';
+import { deletePendingWord, restorePendingWord } from '../../services/db';
 import { useData } from '../../data/DataProvider';
+import { formatWhen, expiryPhrase } from './when';
 
 function SavedRow({ item, onPractice, onOpenDetails, onRemove }) {
   const [dragOffset, setDragOffset] = useState(0);
-  const isExpiring = (item.expiresInDays && item.expiresInDays <= 2) || item.hot;
+  const isExpiring = typeof item.expiresInDays === 'number' && item.expiresInDays <= 2;
 
-  const dueLabel = item.dueLabel || (
-    item.expiresInDays
-      ? (item.expiresInDays <= 2 ? `Expires in ${item.expiresInDays}d` : `Expires in ${item.expiresInDays}d`)
-      : 'Saved for later'
-  );
+  // Real age/expiry from createdAt (DataProvider sets expiresInDays from it).
+  const savedWhen = formatWhen(item.createdAt);
+  const dueLabel = isExpiring
+    ? expiryPhrase(item.expiresInDays).replace(/^e/, 'E')
+    : savedWhen ? `Saved ${savedWhen}` : 'Saved for later';
 
   return (
     <div
@@ -159,7 +160,7 @@ export function SavedList({
             next.delete(wordKey);
             return next;
           });
-          await savePendingWord(currentUser.uid, item);
+          await restorePendingWord(currentUser.uid, item);
           triggerHaptic('light');
         }
       );

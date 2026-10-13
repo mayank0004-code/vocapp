@@ -7,9 +7,9 @@ import { useData } from '../../../data/DataProvider';
 
 export function Done({
   results = [],
-  xpGained = 30,
   mode = 'full',
-  targetWord = 'albeit',
+  targetWord = '',
+  nextReview = '',
   onClose = () => {},
   onReviewWeak = () => {},
   onGoToWords = () => {}
@@ -17,13 +17,20 @@ export function Done({
   const { currentUser } = useData();
   const canvasRef = useRef(null);
 
-  const testedCount = results.length;
-  const correctCount = results.filter(r => r.ok).length;
-  const misses = results.filter(r => !r.ok);
-  const accuracy = testedCount > 0 ? Math.round((correctCount / testedCount) * 100) : 100;
+  // Only flashcard reviews are graded; the writing step is not part of accuracy.
+  const recalls = results.filter(r => r.kind === 'recall');
+  const testedCount = recalls.length;
+  const correctCount = recalls.filter(r => r.ok).length;
+  const misses = recalls.filter(r => !r.ok);
+  const accuracy = testedCount > 0 ? Math.round((correctCount / testedCount) * 100) : null;
+  const wordAdded = results.some(r => r.kind === 'write');
+  const isWordOnly = wordAdded && testedCount === 0;
+  // Celebrate only when something actually happened (not on "All caught up")
+  const shouldCelebrate = testedCount > 0 || wordAdded;
 
   // Canvas Confetti Burst
   useEffect(() => {
+    if (!shouldCelebrate) return;
     triggerHaptic('success');
 
     const canvas = canvasRef.current;
@@ -93,16 +100,16 @@ export function Done({
 
     animationId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animationId);
-  }, []);
+  }, [shouldCelebrate]);
 
   const handleExport = async () => {
     if (!currentUser?.uid) return;
     try {
-      await exportQuestionBankToExcel(currentUser.uid, 'xls');
-      showToast('Question bank exported (.xls)');
+      const res = await exportQuestionBankToExcel(currentUser.uid, 'xls');
+      showToast(res?.count ? `Exported ${res.count} question${res.count === 1 ? '' : 's'} (.xls)` : 'Question bank exported (.xls)');
     } catch (e) {
       console.error(e);
-      showToast('Export questions ready');
+      showToast(e?.message || 'Export failed. Try again.');
     }
   };
 
@@ -176,7 +183,7 @@ export function Done({
             }}
             className="rise"
           >
-            {mode === 'word' ? `${targetWord} added` : 'Session done'}
+            {isWordOnly ? `${targetWord} added` : testedCount > 0 ? 'Session complete' : 'All caught up'}
           </h2>
           <span
             style={{
@@ -189,7 +196,9 @@ export function Done({
           >
             {testedCount > 0
               ? `${correctCount} of ${testedCount} recalled (${accuracy}%)`
-              : '3 practice sentences recorded'}
+              : wordAdded
+              ? '3 practice sentences recorded'
+              : 'No words are due for review right now.'}
           </span>
         </div>
       </div>
@@ -218,9 +227,9 @@ export function Done({
           className="rise"
         >
           <b className="num" style={{ fontSize: '24px', fontWeight: 700, color: 'var(--acc2)' }}>
-            +{xpGained}
+            {accuracy === null ? '–' : `${accuracy}%`}
           </b>
-          <span style={{ fontSize: '12px', color: 'var(--mute)' }}>writing XP</span>
+          <span style={{ fontSize: '12px', color: 'var(--mute)' }}>accuracy</span>
         </div>
 
         <div
@@ -237,10 +246,10 @@ export function Done({
           className="rise"
         >
           <b className="num" style={{ fontSize: '24px', fontWeight: 700 }}>
-            {mode === 'word' ? '1' : testedCount}
+            {isWordOnly ? '1' : testedCount}
           </b>
           <span style={{ fontSize: '12px', color: 'var(--mute)' }}>
-            {mode === 'word' ? 'word added' : 'reviewed'}
+            {isWordOnly ? 'word added' : 'reviewed'}
           </span>
         </div>
 
@@ -258,7 +267,7 @@ export function Done({
           className="rise"
         >
           <b className="num" style={{ fontSize: '24px', fontWeight: 700, color: 'var(--ok)' }}>
-            ~1 d
+            {nextReview ? nextReview.replace('Next review in ', '') : '–'}
           </b>
           <span style={{ fontSize: '12px', color: 'var(--mute)' }}>next review</span>
         </div>
@@ -295,7 +304,7 @@ export function Done({
               <b className="serif" style={{ fontStyle: 'italic', fontWeight: 500 }}>
                 {m.word || m.id}
               </b>
-              <span style={{ color: 'var(--fg3)', fontSize: '13px' }}>revisiting soon</span>
+              <span style={{ color: 'var(--fg3)', fontSize: '13px' }}>due tomorrow</span>
             </div>
           ))}
         </section>
@@ -312,7 +321,7 @@ export function Done({
           }}
           className="rise"
         >
-          ✓ Every reviewed word moved up an SRS interval!
+          {testedCount > 0 ? '✓ Every reviewed word moved up an SRS interval!' : wordAdded ? '✓ First review scheduled for tomorrow.' : (nextReview || 'Nothing is scheduled yet.')}
         </div>
       )}
 
@@ -357,7 +366,7 @@ export function Done({
             cursor: 'pointer'
           }}
         >
-          Export these questions (.xls)
+          Export my question bank (.xls)
         </button>
       </div>
     </div>

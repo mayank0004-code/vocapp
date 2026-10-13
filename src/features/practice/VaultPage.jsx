@@ -3,6 +3,28 @@ import { useEdgeBack } from '../../motion/useEdgeBack';
 import { useVault } from '../../data/DataProvider';
 import SwipeTabs from '../../ui/SwipeTabs';
 import Button from '../../ui/Button';
+import { PILLARS, pillarOfMistake } from './craft';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** "today" / "yesterday" / "3d ago" / "12 Mar" from an epoch-ms (or Firestore Timestamp) value. */
+function formatWhen(value) {
+  const ms = typeof value === 'number' ? value : value?.toMillis?.() ?? (value ? new Date(value).getTime() : NaN);
+  if (!Number.isFinite(ms)) return '';
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  if (ms >= startOfToday.getTime()) return 'today';
+  const days = Math.ceil((startOfToday.getTime() - ms) / DAY_MS);
+  if (days <= 1) return 'yesterday';
+  if (days < 7) return `${days}d ago`;
+  return new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+const EMPTY_COPY = [
+  'No slips yet. Mistakes from your Practice drills land here.',
+  'Nothing to fix. Every slip is fixed.',
+  'No fixed slips yet. Fix one to see it here.'
+];
 
 export function VaultPage({ onBack, onFixMistake = () => {} }) {
   const containerRef = useEdgeBack({ onPop: onBack, enabled: true });
@@ -87,14 +109,14 @@ export function VaultPage({ onBack, onFixMistake = () => {} }) {
           Mistake Vault
         </h1>
         <p style={{ margin: '0 0 16px', fontSize: '15px', color: 'var(--fg3)', lineHeight: 1.45 }}>
-          Every slip from your writing, with a better version. Fix them to rank up.
+          Every slip from your Practice drills, with a better version. Fix them to rank up.
         </p>
 
         {/* Tab Selector */}
         <div style={{ marginBottom: '18px' }}>
           <SwipeTabs
             tabs={tabs}
-            activeTab={activeTab}
+            activeIndex={activeTab}
             onChange={setActiveTab}
           />
         </div>
@@ -113,14 +135,20 @@ export function VaultPage({ onBack, onFixMistake = () => {} }) {
               border: '1px solid var(--line)'
             }}
           >
-            Nothing here. Every slip in this view is fixed.
+            {EMPTY_COPY[activeTab]}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {currentList.map((slip, idx) => {
               const isFixed = slip.fixed || slip.isRedeemed;
-              const originalSentence = slip.orig || slip.originalSentence || slip.sentence || '';
-              const betterSentence = slip.better || slip.correctedSentence || slip.fix || '';
+              const originalSentence = slip.originalSentence || slip.orig || slip.sentence || '';
+              const betterSentence = slip.reframedSentence || slip.better || slip.correctedSentence || '';
+              const pillarKey = pillarOfMistake(slip);
+              const tag = pillarKey ? PILLARS[pillarKey].label : (slip.errorTags?.[0] || '');
+              const diagnosis = slip.structuralDiagnosis || '';
+              const tip = slip.ruleOfThumb && slip.ruleOfThumb !== diagnosis ? slip.ruleOfThumb : '';
+              const loggedWhen = formatWhen(slip.timestamp);
+              const fixedWhen = formatWhen(slip.redeemedAt);
 
               return (
                 <div
@@ -144,9 +172,9 @@ export function VaultPage({ onBack, onFixMistake = () => {} }) {
                       >
                         {slip.word || 'Writing slip'}
                       </span>
-                      {slip.rule && (
+                      {tag && (
                         <span style={{ fontSize: '12.5px', color: 'var(--mute)', fontWeight: 500 }}>
-                          · {slip.rule}
+                          · {tag}
                         </span>
                       )}
                     </div>
@@ -181,7 +209,12 @@ export function VaultPage({ onBack, onFixMistake = () => {} }) {
                   )}
 
                   {/* What to fix & Tip */}
-                  {slip.tip && (
+                  {diagnosis && (
+                    <div style={{ fontSize: '13.5px', color: 'var(--fg3)', lineHeight: 1.45 }}>
+                      {diagnosis}
+                    </div>
+                  )}
+                  {tip && (
                     <div
                       style={{
                         padding: '10px 12px',
@@ -193,15 +226,18 @@ export function VaultPage({ onBack, onFixMistake = () => {} }) {
                       }}
                     >
                       <strong style={{ color: 'var(--fg2)' }}>Tip: </strong>
-                      {slip.tip}
+                      {tip}
                     </div>
                   )}
 
                   {/* Action / Fixed Footer */}
-                  <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <div style={{ marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '12.5px', color: 'var(--mute)' }}>
+                      {loggedWhen ? `Logged ${loggedWhen}` : ''}
+                    </span>
                     {isFixed ? (
                       <span style={{ fontSize: '13px', color: 'var(--ok)', fontWeight: 500 }}>
-                        ✓ Fixed {slip.when || 'recently'}
+                        ✓ Fixed{fixedWhen ? ` ${fixedWhen}` : ''}
                       </span>
                     ) : (
                       <Button

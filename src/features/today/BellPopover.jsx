@@ -6,6 +6,7 @@ export function BellPopover({
   isOpen = false,
   onClose = () => {},
   expiringWord = null,
+  expiringCount = 0,
   onPractice = () => {}
 }) {
   const popoverRef = useRef(null);
@@ -71,7 +72,15 @@ export function BellPopover({
                 <em className="serif" style={{ fontSize: '17px', fontStyle: 'italic', fontWeight: 500, color: 'var(--fg)' }}>
                   {expiringWord.word}
                 </em>{' '}
-                will be removed in {expiringWord.expiresInDays || 2} days unless you practise it.
+                {expiringWord.expiresInDays > 0
+                  ? `will be removed in ${expiringWord.expiresInDays} ${expiringWord.expiresInDays === 1 ? 'day' : 'days'}`
+                  : 'will be removed today'}{' '}
+                unless you practise it.
+                {expiringCount > 1 && (
+                  <span style={{ display: 'block', marginTop: '6px', fontSize: '13px', color: 'var(--mute)' }}>
+                    {expiringCount - 1} more saved {expiringCount - 1 === 1 ? 'word expires' : 'words expire'} within 2 days.
+                  </span>
+                )}
               </>
             ) : (
               'Nothing is about to expire. You’re all caught up.'
@@ -92,7 +101,7 @@ export function BellPopover({
                   size="sm"
                   onClick={() => {
                     onClose();
-                    onPractice(expiringWord.word);
+                    onPractice(expiringWord);
                   }}
                 >
                   Practise now

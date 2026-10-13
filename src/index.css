@@ -1,70 +1,137 @@
+/* ============================================================
+   PHASE 1 — NEW DESIGN SYSTEM TOKENS
+   Added alongside existing tokens. Old tokens removed per-screen
+   during Phase 3. Legacy set deleted in final commit.
+   ============================================================ */
+
 :root {
-  /* Apple-inspired Light Theme */
+  /* ── Apple System Colors ──────────────────────────────────── */
   --bg-color: #f5f5f7;
   --surface-color: #ffffff;
   --text-primary: #1d1d1f;
   --text-secondary: #86868b;
+  --text-tertiary: #aeaeb2;
   --border-color: #d2d2d7;
   --accent-color: #0071e3;
   --accent-hover: #0077ed;
-  
+
+  /* ── Semantic — state and outcome only, never decoration ─── */
+  --color-success: #34c759;
+  --color-warning: #ff9500;
+  --color-error:   #ff3b30;
+  /* Legacy aliases */
   --success-color: #34c759;
-  --error-color: #ff3b30;
+  --error-color:   #ff3b30;
   --warning-color: #ff9500;
 
-  /* Typography */
-  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  /* ── Categorical — chart series only, never semantic ────────
+     Luminance (0.299R+0.587G+0.114B) in light mode: 35,86,127,201
+     Steps of 51, 41, 74 — distinct in greyscale.
+     All hues ≥40° from any semantic or accent token.          */
+  --cat-1: #2e1065; /* Violet   L=35  hue 267° */
+  --cat-2: #0f766e; /* Teal     L=86  hue 176° */
+  --cat-3: #65a30d; /* Lime     L=127 hue  85° */
+  --cat-4: #f0abfc; /* Fuchsia  L=201 hue 293° */
 
-  /* Effects */
+  /* ── Typography scale ────────────────────────────────────────
+     Size · Weight · Line-height · Letter-spacing move as a set */
+  --type-xs:      11px; --type-xs-weight: 600; --type-xs-lh: 1.4; --type-xs-ls: 0.06em;
+  --type-sm:      13px; --type-sm-weight: 400; --type-sm-lh: 1.4; --type-sm-ls: 0.01em;
+  --type-body:    16px; --type-body-weight: 400; --type-body-lh: 1.5; --type-body-ls: 0;
+  --type-lead:    20px; --type-lead-weight: 400; --type-lead-lh: 1.4; --type-lead-ls: -0.01em;
+  --type-title:   24px; --type-title-weight: 600; --type-title-lh: 1.2; --type-title-ls: -0.02em;
+  --type-display: 34px; --type-display-weight: 700; --type-display-lh: 1.05; --type-display-ls: -0.03em;
+
+  /* ── Spacing — 4pt grid. No value exists outside this list ── */
+  --sp-1: 4px;   --sp-2: 8px;   --sp-3: 12px;  --sp-4: 16px;
+  --sp-5: 20px;  --sp-6: 24px;  --sp-8: 32px;  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* ── Safe Area ───────────────────────────────────────────── */
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,   0px);
+  --safe-right:  env(safe-area-inset-right,  0px);
+
+  /* ── Effects ─────────────────────────────────────────────── */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   18px;
   --radius-pill: 9999px;
-  
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-blur: blur(20px);
+
+  /* ── Glass ───────────────────────────────────────────────── */
+  --glass-bg:   rgba(255, 255, 255, 0.72);
+  --glass-blur: blur(20px) saturate(180%);
+
+  /* ── Legacy font var (kept until migration complete) ─────── */
+  --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
 
+/* ── Dark Theme ──────────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Apple-inspired Dark Theme */
-    --bg-color: #000000;
+    --bg-color:      #000000;
     --surface-color: #1c1c1e;
-    --text-primary: #f5f5f7;
-    --text-secondary: #a1a1a6;
-    --border-color: #38383a;
-    --accent-color: #2997ff;
-    --accent-hover: #0071e3;
-    
+    --text-primary:  #f5f5f7;
+    --text-secondary:#a1a1a6;
+    --text-tertiary: #636366;
+    --border-color:  #38383a;
+    --accent-color:  #2997ff;
+    --accent-hover:  #0071e3;
+
+    --color-success: #32d74b;
+    --color-warning: #ff9f0a;
+    --color-error:   #ff453a;
     --success-color: #32d74b;
-    --error-color: #ff453a;
+    --error-color:   #ff453a;
     --warning-color: #ff9f0a;
 
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+    /* Categorical — lighter variants for dark backgrounds */
+    --cat-1: #c4b5fd; /* Violet light */
+    --cat-2: #5eead4; /* Teal light   */
+    --cat-3: #bef264; /* Lime light   */
+    --cat-4: #a855f7; /* Fuchsia mid  */
+
+    --shadow-sm: 0 2px 8px  rgba(0, 0, 0, 0.2);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
 
-    --glass-bg: rgba(28, 28, 30, 0.7);
+    --glass-bg: rgba(28, 28, 30, 0.72);
   }
 }
 
-* {
+/* ============================================================
+   BASE RESET
+   ============================================================ */
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html {
+  /* Prevent layout shift when scrollbar appears */
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family: var(--font-family);
+  font-size: var(--type-body);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-lh);
+  letter-spacing: var(--type-body-ls);
   font-optical-sizing: auto;
   background-color: var(--bg-color);
   color: var(--text-primary);
-  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent tap highlight on iOS */
+  -webkit-tap-highlight-color: transparent;
 }
 
 #root {
@@ -73,146 +140,474 @@ body {
   flex-direction: column;
 }
 
-/* Base Components */
-.container {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 24px;
-  width: 100%;
+/* ============================================================
+   TYPOGRAPHY UTILITY CLASSES
+   ============================================================ */
+.t-display {
+  font-size: var(--type-display);
+  font-weight: var(--type-display-weight);
+  line-height: var(--type-display-lh);
+  letter-spacing: var(--type-display-ls);
+}
+.t-title {
+  font-size: var(--type-title);
+  font-weight: var(--type-title-weight);
+  line-height: var(--type-title-lh);
+  letter-spacing: var(--type-title-ls);
+}
+.t-lead {
+  font-size: var(--type-lead);
+  font-weight: var(--type-lead-weight);
+  line-height: var(--type-lead-lh);
+  letter-spacing: var(--type-lead-ls);
+}
+.t-body {
+  font-size: var(--type-body);
+  font-weight: var(--type-body-weight);
+  line-height: var(--type-body-lh);
+  letter-spacing: var(--type-body-ls);
+}
+.t-sm {
+  font-size: var(--type-sm);
+  font-weight: var(--type-sm-weight);
+  line-height: var(--type-sm-lh);
+  letter-spacing: var(--type-sm-ls);
+}
+/* Secondary label — small-caps treatment */
+.t-label {
+  font-size: var(--type-xs);
+  font-weight: var(--type-xs-weight);
+  line-height: var(--type-xs-lh);
+  letter-spacing: var(--type-xs-ls);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
 }
 
-.glass-panel {
+/* Reading column cap */
+.reading-col {
+  max-width: 65ch;
+}
+
+/* ============================================================
+   SURFACE TAXONOMY
+   ============================================================ */
+
+/* Raised — one per screen, the thing to act on */
+.surface-raised {
+  background: var(--surface-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+/* Grouped — lists. One surface, hairline dividers. No per-row shadow. */
+.surface-grouped {
+  background: var(--surface-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden; /* clip first/last divider to radius */
+}
+/* Hairline divider via scaled pseudo-element (renders 0.5px on retina, 1px on 1×) */
+.surface-grouped > * + * {
+  position: relative;
+}
+.surface-grouped > * + *::before {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 0; left: var(--sp-4); right: 0;
+  height: 1px;
+  transform: scaleY(0.5);
+  transform-origin: top;
+  background: var(--border-color);
+}
+
+/* ============================================================
+   APP SHELL — Phase 2 will wire this up in Dashboard.jsx.
+   Declared here so the classes are available.
+   ============================================================ */
+.app-shell {
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding-top: var(--safe-top);
+  /* Translucent material */
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  /* No border. Gradient mask applied via JS sentinel — see Phase 2. */
 }
 
+.app-scroll {
+  flex: 1;
+  overflow-y: auto;
+  /* Prevent iOS from rubber-banding the whole shell behind fixed chrome */
+  overscroll-behavior-y: contain;
+  /* padding-top set dynamically to header height in Dashboard.jsx */
+}
+
+/* nav pill — positioned in Dashboard.jsx */
+.nav-pill {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  padding-bottom: calc(var(--sp-3) + var(--safe-bottom));
+  /* Translucent material */
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 20px;
+  gap: var(--sp-2);
+  padding: 10px var(--sp-5);
+  font-family: var(--font-family);
+  font-size: var(--type-body);
   font-weight: 500;
-  font-size: 15px;
   border-radius: var(--radius-pill);
   border: none;
   cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1);
-  font-family: var(--font-family);
+  /* Press feedback — ease-out only, no spring wobble on a tap */
+  transition: transform 100ms ease-out, background-color 150ms ease, opacity 150ms ease;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+/* Focus ring — visible for keyboard users */
+.btn:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
 }
 
 .btn-primary {
-  background-color: var(--accent-color);
+  background: var(--accent-color);
   color: #fff;
 }
-
-.btn-primary:hover {
-  background-color: var(--accent-hover);
-  transform: scale(0.98);
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
-.btn-primary:disabled {
-  background-color: var(--text-secondary);
-  cursor: not-allowed;
-  transform: none;
-  opacity: 0.5;
+.btn-secondary {
+  background: rgba(120, 120, 128, 0.16);
+  color: var(--text-primary);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(120, 120, 128, 0.24);
 }
 
 .btn-outline {
-  background-color: transparent;
+  background: transparent;
   color: var(--accent-color);
   border: 1px solid var(--accent-color);
 }
-
-.btn-outline:hover {
-  background-color: rgba(0, 113, 227, 0.1);
+.btn-outline:hover:not(:disabled) {
+  background: rgba(0, 113, 227, 0.08);
 }
 
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: var(--sp-2);
+  border-radius: var(--radius-md);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(120, 120, 128, 0.12);
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   INPUTS
+   ============================================================ */
 .input {
   width: 100%;
-  padding: 14px 16px;
-  font-size: 17px;
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--type-body);
   font-family: var(--font-family);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
-  background-color: var(--surface-color);
+  background: var(--surface-color);
   color: var(--text-primary);
-  transition: border-color 0.4s cubic-bezier(0.175, 0.885, 0.32, 1), box-shadow 0.4s cubic-bezier(0.175, 0.885, 0.32, 1);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+  -webkit-appearance: none;
 }
-
 .input:focus {
   outline: none;
   border-color: var(--accent-color);
-  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.2);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.2);
+}
+.input::placeholder {
+  color: var(--text-tertiary);
 }
 
-.text-title {
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-bottom: 8px;
-}
 
-.text-heading {
-  font-size: 24px;
-  font-weight: 600;
+
+/* ============================================================
+   FLASHCARD — Grid-stacked 3D flip card with dynamic height
+   ============================================================ */
+.flashcard-container {
+  perspective: 1000px;
+  width: 100%;
+  margin-bottom: var(--sp-4);
+}
+.flashcard {
+  display: grid;
+  grid-template-areas: "card";
+  width: 100%;
+  min-height: 300px;
+  position: relative;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-style: preserve-3d;
+  cursor: pointer;
+}
+.flashcard.flipped {
+  transform: rotateX(180deg);
+}
+.flashcard-front,
+.flashcard-back {
+  grid-area: card;
+  width: 100%;
+  min-height: 300px;
+  box-sizing: border-box;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  padding: var(--sp-4) var(--sp-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  overflow-y: auto;
+  max-height: 480px;
+  -webkit-overflow-scrolling: touch;
+}
+.flashcard-front {
+  transform: rotateX(0deg);
+  background: rgba(0, 113, 227, 0.04);
+  border-color: rgba(0, 113, 227, 0.2);
+}
+.flashcard-back {
+  transform: rotateX(180deg);
+}
+.flashcard-text {
+  font-size: clamp(0.95rem, 3.2vw, 1.1rem);
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  margin: 0;
+  max-width: 100%;
+}
+.flashcard-question {
+  font-style: italic;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: var(--sp-2);
+}
+.flashcard-definition {
+  color: var(--text-secondary);
+  font-size: clamp(0.9rem, 3vw, 1rem);
+  line-height: 1.5;
+  margin: 0;
+}
+.flashcard-cue {
+  font-size: var(--type-xs);
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+.flashcard-word {
+  margin-bottom: 2px;
+  color: var(--text-primary);
+  font-size: clamp(1.4rem, 4vw, 1.75rem);
   letter-spacing: -0.01em;
 }
 
-.text-subheading {
-  font-size: 17px;
-  font-weight: 500;
-  color: var(--text-secondary);
+/* Rich Flashcard Metadata Callout Boxes */
+.flashcard-meaning-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-color);
+  background: rgba(0, 113, 227, 0.08);
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(0, 113, 227, 0.2);
+  display: inline-flex;
+  align-items: center;
 }
-
-.text-body {
-  font-size: 15px;
+.flashcard-relates-box {
+  width: 100%;
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-md);
+  background: rgba(120, 120, 128, 0.06);
+  border-left: 3px solid var(--accent-color);
+}
+.flashcard-anchor-box {
+  width: 100%;
+  margin: var(--sp-2) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-md);
+  background: rgba(255, 149, 0, 0.06);
+  border-left: 3px solid #FF9500;
+}
+.flashcard-box-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.flashcard-box-text {
+  font-size: clamp(0.85rem, 2.7vw, 0.95rem);
+  line-height: 1.45;
   color: var(--text-primary);
+  margin: 0;
+}
+.flashcard-secondary-spotlight {
+  width: 100%;
+  margin: var(--sp-3) 0 var(--sp-2);
+  padding: var(--sp-3);
+  border-radius: var(--radius-md);
+  background: rgba(0, 113, 227, 0.06);
+  border: 1px dashed rgba(0, 113, 227, 0.3);
+  text-align: left;
 }
 
-.text-caption {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(30px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slideOutLeft {
-  from { opacity: 1; transform: translateX(0); }
-  to { opacity: 0; transform: translateX(-30px); }
-}
-
+/* ============================================================
+   REDUCED MOTION
+   Targets .sheet and .card-stack (Phase 3 components).
+   Opacity/colour/press feedback kept — only slides and overshoot removed.
+   ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .sheet,
+  .card-stack {
+    transition: opacity 200ms ease !important;
+    transform: none !important;
   }
 }
 
+/* ============================================================
+   REDUCED TRANSPARENCY
+   Targets .nav-pill and .app-header.
+   NO .bottom-nav selector — that element does not exist.
+   ============================================================ */
 @media (prefers-reduced-transparency: reduce) {
-  .glass-panel, .bottom-nav {
+  .nav-pill,
+  .app-header {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: var(--surface-color) !important;
   }
 }
+
+/* ============================================================
+   FOCUS RING — global default for keyboard navigation
+   ============================================================ */
+:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
 .animate-spin {
   animation: spin 1s linear infinite;
 }
 @keyframes spin {
   from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--border-color) 25%,
+    rgba(120, 120, 128, 0.08) 50%,
+    var(--border-color) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* ============================================================
+   NUANCE DUEL (Studio: Context & Register)
+   ============================================================ */
+.nuance-card-container {
+  animation: fadeIn 0.22s ease-out;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.nuance-word-chip {
+  position: relative;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nuance-word-chip:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--accent-color);
+}
+
+.nuance-word-chip:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.nuance-sentence-slot {
+  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  border: 1px solid var(--border-color);
+  background: var(--surface-color);
+}
+
+.nuance-sentence-slot:focus-within {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.15);
 }
